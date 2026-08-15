@@ -8,22 +8,29 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Menu
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
+import com.mlevngr.inknote.markdown.MarkdownBlockStyle
+import com.mlevngr.inknote.markdown.MarkdownEditResult
+import com.mlevngr.inknote.markdown.MarkdownEditing
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
@@ -43,6 +50,8 @@ class EditorActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var modeButton: AppCompatImageButton
     private lateinit var titleInput: ImeBackTextInputEditText
+    private lateinit var markdownToolbar: View
+    private lateinit var headingButton: MaterialButton
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val renderRevision = AtomicInteger()
@@ -152,8 +161,10 @@ class EditorActivity : AppCompatActivity() {
         findViewById<AppCompatImageButton>(R.id.insert_asset).setOnClickListener {
             openAsset.launch(arrayOf("*/*"))
         }
+        setupMarkdownToolbar()
         updateModeButton()
         updateTitleInteraction()
+        updateMarkdownToolbar()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = handleBackNavigation()
         })
@@ -178,6 +189,7 @@ class EditorActivity : AppCompatActivity() {
         lastActiveLine = activeLine ?: 0
         updateModeButton()
         updateTitleInteraction()
+        updateMarkdownToolbar()
         refreshRows(requestFocus = true)
     }
 
@@ -186,6 +198,7 @@ class EditorActivity : AppCompatActivity() {
         activeLine = null
         updateModeButton()
         updateTitleInteraction()
+        updateMarkdownToolbar()
         refreshRows()
         titleInput.post {
             titleInput.requestFocus()
@@ -204,6 +217,7 @@ class EditorActivity : AppCompatActivity() {
         recyclerView.clearFocus()
         updateModeButton()
         updateTitleInteraction()
+        updateMarkdownToolbar()
         refreshRows()
         scheduleSave()
     }
@@ -221,6 +235,94 @@ class EditorActivity : AppCompatActivity() {
         titleInput.isFocusable = editing
         titleInput.isFocusableInTouchMode = editing
         titleInput.isCursorVisible = editing && titleInput.hasFocus()
+    }
+
+    private fun setupMarkdownToolbar() {
+        markdownToolbar = findViewById(R.id.markdown_toolbar)
+        headingButton = findViewById<MaterialButton>(R.id.markdown_heading).also { button ->
+            button.setOnClickListener { showHeadingMenu() }
+        }
+        findViewById<View>(R.id.markdown_bold).setOnClickListener {
+            applyMarkdownEdit(MarkdownEditing::bold)
+        }
+        findViewById<View>(R.id.markdown_italic).setOnClickListener {
+            applyMarkdownEdit(MarkdownEditing::italic)
+        }
+        findViewById<View>(R.id.markdown_strikethrough).setOnClickListener {
+            applyMarkdownEdit(MarkdownEditing::strikethrough)
+        }
+        findViewById<View>(R.id.markdown_task).setOnClickListener {
+            applyBlockStyle(MarkdownBlockStyle.Task)
+        }
+        findViewById<View>(R.id.markdown_bullet_list).setOnClickListener {
+            applyBlockStyle(MarkdownBlockStyle.Bullet)
+        }
+        findViewById<View>(R.id.markdown_numbered_list).setOnClickListener {
+            applyBlockStyle(MarkdownBlockStyle.Ordered)
+        }
+        findViewById<View>(R.id.markdown_quote).setOnClickListener {
+            applyBlockStyle(MarkdownBlockStyle.Quote)
+        }
+        findViewById<View>(R.id.markdown_inline_code).setOnClickListener {
+            applyMarkdownEdit(MarkdownEditing::inlineCode)
+        }
+        findViewById<View>(R.id.markdown_link).setOnClickListener {
+            val placeholder = getString(R.string.markdown_link_placeholder)
+            applyMarkdownEdit { source, start, end ->
+                MarkdownEditing.link(source, start, end, placeholder)
+            }
+        }
+    }
+
+    private fun showHeadingMenu() {
+        val current = activeLine?.let { MarkdownEditing.headingLevel(document[it]) } ?: 0
+        PopupMenu(this, headingButton).apply {
+            menu.add(Menu.NONE, 0, 0, getString(R.string.markdown_body))
+            val labels = intArrayOf(
+                R.string.markdown_heading_1,
+                R.string.markdown_heading_2,
+                R.string.markdown_heading_3,
+                R.string.markdown_heading_4,
+                R.string.markdown_heading_5,
+                R.string.markdown_heading_6
+            )
+            labels.forEachIndexed { index, label ->
+                val level = index + 1
+                menu.add(Menu.NONE, level, level, "H$level  ${getString(label)}")
+            }
+            menu.setGroupCheckable(Menu.NONE, true, true)
+            menu.findItem(current)?.isChecked = true
+            setOnMenuItemClickListener { item ->
+                applyMarkdownEdit { source, start, end ->
+                    MarkdownEditing.setHeading(source, start, end, item.itemId)
+                }
+                true
+            }
+            show()
+        }
+    }
+
+    private fun applyBlockStyle(style: MarkdownBlockStyle) {
+        applyMarkdownEdit { source, start, end ->
+            MarkdownEditing.toggleBlock(source, start, end, style)
+        }
+    }
+
+    private fun applyMarkdownEdit(
+        transform: (String, Int, Int) -> MarkdownEditResult
+    ) {
+        val line = activeLine ?: return
+        noteAdapter.editActiveLine(line, transform)
+    }
+
+    private fun updateMarkdownToolbar() {
+        val line = activeLine
+        val visible = mode == EditorMode.Edit && line != null
+        markdownToolbar.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) {
+            val level = MarkdownEditing.headingLevel(document[line])
+            headingButton.text = if (level == 0) getString(R.string.markdown_body) else "H$level"
+        }
     }
 
     private fun commitTitleRename(): Boolean {
@@ -259,12 +361,14 @@ class EditorActivity : AppCompatActivity() {
         if (mode != EditorMode.Edit || activeLine == index) return
         activeLine = index
         lastActiveLine = index
+        updateMarkdownToolbar()
         refreshRows(requestFocus = true)
     }
 
     private fun updateLine(index: Int, source: String) {
         if (index !in 0 until document.size) return
         document.update(index, source)
+        updateMarkdownToolbar()
         scheduleSave()
         ensureActiveEditorVisible()
     }
@@ -273,6 +377,7 @@ class EditorActivity : AppCompatActivity() {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return
         activeLine = document.splitLine(index, cursor)
         lastActiveLine = activeLine ?: index
+        updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = 0)
         scheduleSave()
     }
@@ -282,6 +387,7 @@ class EditorActivity : AppCompatActivity() {
         val cursor = document.mergeWithPrevious(index) ?: return false
         activeLine = index - 1
         lastActiveLine = activeLine ?: 0
+        updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = cursor)
         scheduleSave()
         return true
@@ -300,6 +406,7 @@ class EditorActivity : AppCompatActivity() {
         val cursorInLine = beforeCursor.substringAfterLast('\n').length
         activeLine = index + relativeLine
         lastActiveLine = activeLine ?: index
+        updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = cursorInLine)
         scheduleSave()
     }

@@ -73,4 +73,153 @@
         android:paddingBottom="32dp"
         android:scrollbars="vertical" />
 
+    <HorizontalScrollView
+        android:id="@+id/markdown_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="?attr/colorSurfaceContainer"
+        android:clipToPadding="false"
+        android:contentDescription="@string/markdown_toolbar"
+        android:elevation="4dp"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/markdown_heading"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:focusable="false"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:minWidth="76dp"
+                android:text="@string/markdown_body"
+                android:textAllCaps="false"
+                android:tooltipText="@string/markdown_heading"
+                app:icon="@drawable/ic_arrow_drop_down_24"
+                app:iconGravity="textEnd"
+                app:iconPadding="4dp"
+                app:iconSize="18dp" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_bold"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_bold"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_bold_24"
+                android:tooltipText="@string/markdown_bold"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_italic"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_italic"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_italic_24"
+                android:tooltipText="@string/markdown_italic"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_strikethrough"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_strikethrough"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_strikethrough_24"
+                android:tooltipText="@string/markdown_strikethrough"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_task"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_task"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_checklist_24"
+                android:tooltipText="@string/markdown_task"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_bullet_list"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_bullet_list"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_list_bulleted_24"
+                android:tooltipText="@string/markdown_bullet_list"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_numbered_list"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_numbered_list"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_list_numbered_24"
+                android:tooltipText="@string/markdown_numbered_list"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_quote"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_quote"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_format_quote_24"
+                android:tooltipText="@string/markdown_quote"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_inline_code"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_inline_code"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_code_24"
+                android:tooltipText="@string/markdown_inline_code"
+                app:tint="?attr/colorOnSurface" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/markdown_link"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/markdown_link"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_link_24"
+                android:tooltipText="@string/markdown_link"
+                app:tint="?attr/colorOnSurface" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
 </LinearLayout>

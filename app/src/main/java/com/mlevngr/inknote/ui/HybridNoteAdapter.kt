@@ -31,6 +31,8 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.appearance.ThemeColors
+import com.mlevngr.inknote.markdown.MarkdownAutoPairing
+import com.mlevngr.inknote.markdown.MarkdownEditResult
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import com.mlevngr.inknote.ui.AssetPreviewVisibility.AssetInstanceKey
 import io.noties.markwon.Markwon
@@ -74,6 +76,9 @@ class HybridNoteAdapter(
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
     private var editing = false
+    private var activeEditor: LineEditText? = null
+    private var activeEditorLine: Int? = null
+    private var pendingEdit: PendingEdit? = null
     private val horizontalPadding = dp(18)
     private val targetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
 
@@ -89,6 +94,7 @@ class HybridNoteAdapter(
         this.editing = editing
         this.focusLine = focusLine
         this.focusCursor = focusCursor
+        if (!editing) pendingEdit = null
         rebuildVisibleRows()
         notifyDataSetChanged()
     }
@@ -100,6 +106,40 @@ class HybridNoteAdapter(
     }
 
     fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
+
+    fun editActiveLine(
+        lineIndex: Int,
+        transform: (source: String, selectionStart: Int, selectionEnd: Int) -> MarkdownEditResult
+    ) {
+        val editor = activeEditor?.takeIf {
+            it.isAttachedToWindow && activeEditorLine == lineIndex
+        }
+        if (editor == null) {
+            pendingEdit = PendingEdit(lineIndex, transform)
+            return
+        }
+        applyEdit(editor, transform)
+    }
+
+    private fun applyEdit(
+        editor: LineEditText,
+        transform: (source: String, selectionStart: Int, selectionEnd: Int) -> MarkdownEditResult
+    ) {
+        val source = editor.text?.toString().orEmpty()
+        val selectionStart = editor.selectionStart.coerceAtLeast(0)
+        val selectionEnd = editor.selectionEnd.coerceAtLeast(0)
+        val result = transform(source, selectionStart, selectionEnd)
+        if (result.source != source) {
+            editor.editableText.replace(0, editor.editableText.length, result.source)
+        }
+        editor.setSelection(
+            result.selectionStart.coerceIn(0, editor.length()),
+            result.selectionEnd.coerceIn(0, editor.length())
+        )
+        editor.requestFocus()
+        context.getSystemService<InputMethodManager>()
+            ?.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT)
+    }
 
     override fun getItemCount(): Int = rows.size + 1
 
@@ -302,7 +342,13 @@ class HybridNoteAdapter(
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnLongClickListener(null)
         holder.itemView.setOnTouchListener(null)
-        if (holder is EditorHolder) holder.detach()
+        if (holder is EditorHolder) {
+            if (activeEditor === holder.editor) {
+                activeEditor = null
+                activeEditorLine = null
+            }
+            holder.detach()
+        }
         if (holder is AssetHolder) {
             holder.caption.setOnClickListener(null)
             holder.caption.setOnLongClickListener(null)
@@ -313,6 +359,8 @@ class HybridNoteAdapter(
     }
 
     private fun bindEditor(holder: EditorHolder, row: HybridRow.Editor) {
+        activeEditor = holder.editor
+        activeEditorLine = row.lineIndex
         holder.bind(
             row.lineIndex,
             row.source,
@@ -333,6 +381,14 @@ class HybridNoteAdapter(
                 )
                 context.getSystemService<InputMethodManager>()
                     ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
+        pendingEdit?.takeIf { it.lineIndex == row.lineIndex }?.let { pending ->
+            pendingEdit = null
+            holder.editor.post {
+                if (activeEditor === holder.editor && activeEditorLine == row.lineIndex) {
+                    applyEdit(holder.editor, pending.transform)
+                }
             }
         }
     }
@@ -529,20 +585,63 @@ class HybridNoteAdapter(
     private class LineEditText(context: Context) : ImeBackTextInputEditText(context) {
         var onDeleteAtStart: (() -> Boolean)? = null
 
+        private fun applyEdit(result: MarkdownEditResult) {
+            if (result.source != text?.toString().orEmpty()) {
+                editableText.replace(0, editableText.length, result.source)
+            }
+            setSelection(
+                result.selectionStart.coerceIn(0, length()),
+                result.selectionEnd.coerceIn(0, length())
+            )
+        }
+
+        private fun typeWithAutoPair(input: CharSequence?): Boolean {
+            val value = input?.toString() ?: return false
+            val result = MarkdownAutoPairing.type(
+                text?.toString().orEmpty(),
+                selectionStart.coerceAtLeast(0),
+                selectionEnd.coerceAtLeast(0),
+                value
+            ) ?: return false
+            applyEdit(result)
+            return true
+        }
+
+        private fun deleteEmptyPair(): Boolean {
+            if (selectionStart != selectionEnd) return false
+            val result = MarkdownAutoPairing.deleteEmptyPair(
+                text?.toString().orEmpty(),
+                selectionStart.coerceAtLeast(0)
+            ) ?: return false
+            applyEdit(result)
+            return true
+        }
+
         private fun deleteAtStart(): Boolean {
             if (selectionStart != 0 || selectionEnd != 0) return false
             return onDeleteAtStart?.invoke() == true
         }
 
         override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-            if (keyCode == KeyEvent.KEYCODE_DEL && deleteAtStart()) return true
+            if (keyCode == KeyEvent.KEYCODE_DEL) {
+                if (deleteEmptyPair() || deleteAtStart()) return true
+            } else if (!event.isCtrlPressed && !event.isAltPressed) {
+                val unicode = event.unicodeChar
+                if (unicode > 0 && typeWithAutoPair(unicode.toChar().toString())) return true
+            }
             return super.onKeyDown(keyCode, event)
         }
 
         override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
             val target = super.onCreateInputConnection(outAttrs) ?: return null
             return object : InputConnectionWrapper(target, false) {
+                override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                    if (typeWithAutoPair(text)) return true
+                    return super.commitText(text, newCursorPosition)
+                }
+
                 override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                    if (beforeLength == 1 && afterLength == 0 && deleteEmptyPair()) return true
                     if (beforeLength > 0 && deleteAtStart()) return true
                     return super.deleteSurroundingText(beforeLength, afterLength)
                 }
@@ -551,6 +650,7 @@ class HybridNoteAdapter(
                     beforeLength: Int,
                     afterLength: Int
                 ): Boolean {
+                    if (beforeLength == 1 && afterLength == 0 && deleteEmptyPair()) return true
                     if (beforeLength > 0 && deleteAtStart()) return true
                     return super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
                 }
@@ -618,4 +718,9 @@ class HybridNoteAdapter(
         const val TYPE_ATTACHMENT = 5
         const val TYPE_END_ZONE = 6
     }
+
+    private data class PendingEdit(
+        val lineIndex: Int,
+        val transform: (String, Int, Int) -> MarkdownEditResult
+    )
 }
