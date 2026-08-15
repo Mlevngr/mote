@@ -52,40 +52,6 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         if (lines.size == 1) lines[0] = "" else lines.removeAt(index)
     }
 
-    /** Moves one line using the same blank-line/insert-after semantics as [pasteAt]. */
-    fun moveLineToPasteTarget(sourceIndex: Int, targetLine: Int?): Int {
-        require(sourceIndex in lines.indices) { "Source line index is out of bounds" }
-        if (lines.size == 1) return 0
-
-        val target = targetLine?.coerceIn(lines.indices)
-        if (target == sourceIndex) return sourceIndex
-
-        val replacesBlankTarget = target != null && lines[target].isBlank()
-        val source = lines.removeAt(sourceIndex)
-        val adjustedTarget = target?.let { if (it > sourceIndex) it - 1 else it }
-        if (replacesBlankTarget) {
-            lines[requireNotNull(adjustedTarget)] = source
-            return adjustedTarget
-        }
-
-        val insertion = adjustedTarget?.plus(1) ?: lines.size
-        lines.add(insertion, source)
-        return insertion
-    }
-
-    /** Moves one line to an exact boundary between lines. Boundary 0 is document start. */
-    fun moveLineToInsertion(sourceIndex: Int, boundaryIndex: Int): Int {
-        require(sourceIndex in lines.indices) { "Source line index is out of bounds" }
-        require(boundaryIndex in 0..lines.size) { "Insertion boundary is out of bounds" }
-        if (lines.size == 1) return 0
-
-        val source = lines.removeAt(sourceIndex)
-        val insertion = (boundaryIndex - if (boundaryIndex > sourceIndex) 1 else 0)
-            .coerceIn(0, lines.size)
-        lines.add(insertion, source)
-        return insertion
-    }
-
     /** Pastes source at an exact boundary between lines. Boundary 0 is document start. */
     fun pasteAtInsertion(boundaryIndex: Int, source: String): IntRange {
         require(boundaryIndex in 0..lines.size) { "Insertion boundary is out of bounds" }

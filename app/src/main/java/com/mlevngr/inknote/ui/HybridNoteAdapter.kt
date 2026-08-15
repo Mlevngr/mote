@@ -40,8 +40,6 @@ import java.io.Closeable
 import java.io.File
 import java.util.concurrent.Executors
 
-enum class AssetTransferTarget { Move, Copy }
-
 class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
@@ -70,9 +68,8 @@ class HybridNoteAdapter(
     }
     private var allRows: List<HybridRow> = emptyList()
     private var rows: List<HybridRow> = emptyList()
-    private var displayItems: List<DisplayItem> = listOf(DisplayItem.EndZone)
     private val collapsedAssets = mutableSetOf<AssetInstanceKey>()
-    private var transferTarget: AssetTransferTarget? = null
+    private var assetPastePending = false
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
     private var editing = false
@@ -95,32 +92,26 @@ class HybridNoteAdapter(
         notifyDataSetChanged()
     }
 
-    fun setTransferTarget(target: AssetTransferTarget?) {
-        if (transferTarget == target) return
-        transferTarget = target
-        rebuildDisplayItems()
+    fun setAssetPastePending(pending: Boolean) {
+        if (assetPastePending == pending) return
+        assetPastePending = pending
         notifyDataSetChanged()
     }
 
-    fun positionOfLine(lineIndex: Int): Int = displayItems.indexOfFirst {
-        (it as? DisplayItem.Content)?.row?.lineIndex == lineIndex
-    }
+    fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
 
-    override fun getItemCount(): Int = displayItems.size
+    override fun getItemCount(): Int = rows.size + 1
 
     override fun getItemViewType(position: Int): Int {
-        return when (val item = displayItems[position]) {
-            DisplayItem.EndZone -> TYPE_END_ZONE
-            is DisplayItem.InsertionTarget -> TYPE_INSERT_TARGET
-            is DisplayItem.Content -> when (val row = item.row) {
-                is HybridRow.Editor -> TYPE_EDITOR
-                is HybridRow.Rendered -> when (row.preview) {
-                    is PreviewRow.Markdown -> TYPE_MARKDOWN
-                    is PreviewRow.Image -> TYPE_IMAGE
-                    is PreviewRow.PdfPage -> TYPE_PDF
-                    is PreviewRow.Attachment -> TYPE_ATTACHMENT
-                    is PreviewRow.Error -> TYPE_ERROR
-                }
+        if (position == rows.size) return TYPE_END_ZONE
+        return when (val row = rows[position]) {
+            is HybridRow.Editor -> TYPE_EDITOR
+            is HybridRow.Rendered -> when (row.preview) {
+                is PreviewRow.Markdown -> TYPE_MARKDOWN
+                is PreviewRow.Image -> TYPE_IMAGE
+                is PreviewRow.PdfPage -> TYPE_PDF
+                is PreviewRow.Attachment -> TYPE_ATTACHMENT
+                is PreviewRow.Error -> TYPE_ERROR
             }
         }
     }
@@ -171,17 +162,6 @@ class HybridNoteAdapter(
                 text = context.getString(R.string.document_end_hint)
                 contentDescription = context.getString(R.string.document_end_hint)
             })
-            TYPE_INSERT_TARGET -> TextHolder(TextView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(40)
-                )
-                setPadding(horizontalPadding, 0, horizontalPadding, 0)
-                gravity = Gravity.CENTER
-                textSize = 13f
-                setTextColor(context.getColor(R.color.primary))
-                setBackgroundResource(R.drawable.insertion_target_background)
-            })
             else -> AssetHolder(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -194,19 +174,19 @@ class HybridNoteAdapter(
         }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        when (val item = displayItems[position]) {
-            DisplayItem.EndZone -> bindEndZone(holder as TextHolder)
-            is DisplayItem.InsertionTarget -> bindInsertionTarget(
-                holder as TextHolder,
-                item.boundaryIndex
-            )
-            is DisplayItem.Content -> bindContent(holder, item.row)
+        if (position == rows.size) {
+            bindEndZone(holder as TextHolder)
+            return
         }
+        bindContent(holder, rows[position])
     }
 
     private fun bindContent(holder: RecyclerView.ViewHolder, row: HybridRow) {
         when (row) {
-            is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
+            is HybridRow.Editor -> {
+                bindEditor(holder as EditorHolder, row)
+                holder.editor.setOnLongClickListener(pasteAtBoundaryListener(row.lineIndex))
+            }
             is HybridRow.Rendered -> {
                 val activationListener = activationListener(row.lineIndex)
                 if (editing) {
@@ -223,7 +203,7 @@ class HybridNoteAdapter(
                         holder as TextHolder
                         val blank = preview.source == "\u00a0"
                         holder.text.setTextIsSelectable(!editing && !blank)
-                        val pasteListener = if (blank) {
+                        val pasteListener = pasteAtBoundaryListener(row.lineIndex) ?: if (blank) {
                             View.OnLongClickListener { onPasteAt(row.lineIndex); true }
                         } else null
                         holder.text.setOnLongClickListener(pasteListener)
@@ -248,8 +228,9 @@ class HybridNoteAdapter(
                     is PreviewRow.Error -> {
                         holder as TextHolder
                         holder.text.setTextIsSelectable(false)
-                        holder.text.setOnLongClickListener(null)
-                        holder.itemView.setOnLongClickListener(null)
+                        val pasteListener = pasteAtBoundaryListener(row.lineIndex)
+                        holder.text.setOnLongClickListener(pasteListener)
+                        holder.itemView.setOnLongClickListener(pasteListener)
                         holder.text.setTextColor(context.getColor(R.color.error_text))
                         holder.text.text = preview.message
                     }
@@ -280,16 +261,6 @@ class HybridNoteAdapter(
                 }
             }
         }
-    }
-
-    private fun bindInsertionTarget(holder: TextHolder, boundaryIndex: Int) {
-        val target = transferTarget ?: return
-        holder.text.text = context.getString(
-            if (target == AssetTransferTarget.Move) R.string.move_here else R.string.copy_here
-        )
-        holder.text.contentDescription = holder.text.text
-        holder.text.setOnClickListener { onPasteAtBoundary(boundaryIndex) }
-        holder.text.setOnLongClickListener(null)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -430,7 +401,7 @@ class HybridNoteAdapter(
         file: File,
         label: String
     ) {
-        val listener = View.OnLongClickListener {
+        val listener = pasteAtBoundaryListener(lineIndex) ?: View.OnLongClickListener {
             onAssetActions(lineIndex, file, label)
             true
         }
@@ -438,6 +409,14 @@ class HybridNoteAdapter(
         actionView.setOnLongClickListener(listener)
         menuView?.setOnClickListener { onAssetActions(lineIndex, file, label) }
     }
+
+    private fun pasteAtBoundaryListener(lineIndex: Int): View.OnLongClickListener? =
+        if (assetPastePending) {
+            View.OnLongClickListener {
+                onPasteAtBoundary(lineIndex)
+                true
+            }
+        } else null
 
     private fun assetKey(lineIndex: Int, file: File) =
         AssetInstanceKey(lineIndex, file.canonicalPath)
@@ -454,26 +433,6 @@ class HybridNoteAdapter(
 
     private fun rebuildVisibleRows() {
         rows = AssetPreviewVisibility.visibleRows(allRows, collapsedAssets)
-        rebuildDisplayItems()
-    }
-
-    private fun rebuildDisplayItems() {
-        displayItems = buildList {
-            val boundaries = if (transferTarget == null) {
-                emptySet()
-            } else {
-                InsertionTargetBoundaries.from(rows).toSet()
-            }
-            if (0 in boundaries) add(DisplayItem.InsertionTarget(0))
-            rows.forEachIndexed { index, row ->
-                add(DisplayItem.Content(row))
-                val lastRowForLine = rows.getOrNull(index + 1)?.lineIndex != row.lineIndex
-                if (lastRowForLine && row.lineIndex + 1 in boundaries) {
-                    add(DisplayItem.InsertionTarget(row.lineIndex + 1))
-                }
-            }
-            add(DisplayItem.EndZone)
-        }
     }
 
     private fun loadBitmap(holder: AssetHolder, key: String, loader: () -> Bitmap) {
@@ -657,12 +616,5 @@ class HybridNoteAdapter(
         const val TYPE_ERROR = 4
         const val TYPE_ATTACHMENT = 5
         const val TYPE_END_ZONE = 6
-        const val TYPE_INSERT_TARGET = 7
-    }
-
-    private sealed interface DisplayItem {
-        data class Content(val row: HybridRow) : DisplayItem
-        data class InsertionTarget(val boundaryIndex: Int) : DisplayItem
-        data object EndZone : DisplayItem
     }
 }

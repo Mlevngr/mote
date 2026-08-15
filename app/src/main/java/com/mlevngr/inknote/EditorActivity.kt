@@ -23,7 +23,6 @@ import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
-import com.mlevngr.inknote.ui.AssetTransferTarget
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
@@ -107,7 +106,7 @@ class EditorActivity : AppCompatActivity() {
             onMergeWithPrevious = ::mergeWithPrevious,
             onAssetActions = ::showAssetActions,
             onPasteAt = ::showPasteAt,
-            onPasteAtBoundary = ::pasteAtBoundary,
+            onPasteAtBoundary = ::showPasteAtBoundary,
             onAppendAtEnd = ::appendLineAtEnd,
             onBackFromIme = ::handleBackNavigation
         )
@@ -164,14 +163,7 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun handleBackNavigation() {
-        when {
-            pendingAssetTransfer != null -> {
-                clearAssetTransfer()
-                Toast.makeText(this, R.string.asset_transfer_cancelled, Toast.LENGTH_SHORT).show()
-            }
-            mode == EditorMode.Edit -> enterReadMode()
-            else -> finish()
-        }
+        if (mode == EditorMode.Edit) enterReadMode() else finish()
     }
 
     private fun enterEditMode() {
@@ -399,7 +391,7 @@ class EditorActivity : AppCompatActivity() {
 
     private fun showAssetActions(lineIndex: Int, file: File, label: String) {
         val actions = arrayOf(
-            getString(R.string.move_inserted_file),
+            getString(R.string.cut_inserted_file),
             getString(R.string.copy_inserted_file),
             getString(R.string.remove_inserted_file)
         )
@@ -407,36 +399,42 @@ class EditorActivity : AppCompatActivity() {
             .setTitle(label.ifBlank { file.name })
             .setItems(actions) { _, which ->
                 when (which) {
-                    0 -> stageAssetTransfer(lineIndex, file, label, move = true)
-                    1 -> stageAssetTransfer(lineIndex, file, label, move = false)
+                    0 -> stageAssetTransfer(lineIndex, file, label, cut = true)
+                    1 -> stageAssetTransfer(lineIndex, file, label, cut = false)
                     2 -> confirmDeleteAsset(lineIndex, file)
                 }
             }
             .show()
     }
 
-    private fun stageAssetTransfer(lineIndex: Int, file: File, label: String, move: Boolean) {
+    private fun stageAssetTransfer(lineIndex: Int, file: File, label: String, cut: Boolean) {
         if (lineIndex !in 0 until document.size) return
         val source = document[lineIndex]
         val assetPath = runCatching {
             file.canonicalFile.relativeTo(workspace.root.canonicalFile).invariantSeparatorsPath
         }.getOrElse { file.name }
         if (mode == EditorMode.Edit) enterReadMode()
-        pendingAssetTransfer = AssetTransfer(source, lineIndex, assetPath, move)
-        noteAdapter.setTransferTarget(
-            if (move) AssetTransferTarget.Move else AssetTransferTarget.Copy
+        pendingAssetTransfer = AssetTransfer(source, assetPath)
+        noteAdapter.setAssetPastePending(true)
+        getSystemService<ClipboardManager>()?.setPrimaryClip(
+            ClipData.newPlainText(label.ifBlank { file.name }, source)
         )
-        val clipboard = getSystemService<ClipboardManager>()
-        if (move) {
-            if (clipboardText() == source) clipboard?.clearPrimaryClip()
-        } else {
-            clipboard?.setPrimaryClip(
-                ClipData.newPlainText(label.ifBlank { file.name }, source)
-            )
+        if (cut) {
+            document.removeLine(lineIndex)
+            activeLine = activeLine?.let { active ->
+                when {
+                    active > lineIndex -> active - 1
+                    active == lineIndex -> lineIndex.coerceAtMost(document.size - 1)
+                    else -> active
+                }
+            }
+            lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+            refreshRows()
+            scheduleSave()
         }
         Toast.makeText(
             this,
-            if (move) R.string.asset_ready_to_move else R.string.asset_copied,
+            if (cut) R.string.asset_cut else R.string.asset_copied,
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -457,41 +455,10 @@ class EditorActivity : AppCompatActivity() {
     private fun pasteAt(targetLine: Int?, clipboardText: String?) {
         val stagedTransfer = pendingAssetTransfer
         val transfer = stagedTransfer?.takeIf { pending ->
-            pending.move || clipboardText == null || clipboardText == pending.source
+            clipboardText == null || clipboardText == pending.source
         }
         if (stagedTransfer != null && transfer == null) clearAssetTransfer()
         val target = targetLine?.coerceIn(0, document.size - 1)
-        if (transfer?.move == true) {
-            val currentSource = locateTransferSource(transfer)
-            if (currentSource < 0) {
-                clearAssetTransfer()
-                Toast.makeText(this, R.string.asset_move_source_unavailable, Toast.LENGTH_LONG)
-                    .show()
-                return
-            }
-            val replacesBlank = target != null &&
-                target != currentSource &&
-                document[target].isBlank()
-            val destination = document.moveLineToPasteTarget(currentSource, target)
-            activeLine = remapLineAfterMove(
-                activeLine,
-                currentSource,
-                destination,
-                replacesBlank
-            )
-            lastActiveLine = remapLineAfterMove(
-                lastActiveLine,
-                currentSource,
-                destination,
-                replacesBlank
-            ) ?: 0
-            clearAssetTransfer()
-            refreshRows()
-            scheduleSave()
-            Toast.makeText(this, R.string.asset_moved, Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val source = transfer?.source ?: clipboardText.orEmpty()
         if (source.isEmpty()) return
         if (transfer == null) {
@@ -519,38 +486,10 @@ class EditorActivity : AppCompatActivity() {
 
     private fun pasteAtBoundary(boundaryIndex: Int) {
         val transfer = pendingAssetTransfer ?: run {
-            noteAdapter.setTransferTarget(null)
+            noteAdapter.setAssetPastePending(false)
             return
         }
         val boundary = boundaryIndex.coerceIn(0, document.size)
-        if (transfer.move) {
-            val currentSource = locateTransferSource(transfer)
-            if (currentSource < 0) {
-                clearAssetTransfer()
-                Toast.makeText(this, R.string.asset_move_source_unavailable, Toast.LENGTH_LONG)
-                    .show()
-                return
-            }
-            val destination = document.moveLineToInsertion(currentSource, boundary)
-            activeLine = remapLineAfterMove(
-                activeLine,
-                currentSource,
-                destination,
-                replacedBlank = false
-            )
-            lastActiveLine = remapLineAfterMove(
-                lastActiveLine,
-                currentSource,
-                destination,
-                replacedBlank = false
-            ) ?: 0
-            clearAssetTransfer()
-            refreshRows()
-            scheduleSave()
-            Toast.makeText(this, R.string.asset_moved, Toast.LENGTH_SHORT).show()
-            return
-        }
-
         if (workspace.resolveAsset(transfer.assetPath) == null) {
             clearAssetTransfer()
             Toast.makeText(this, R.string.asset_clipboard_unavailable, Toast.LENGTH_LONG).show()
@@ -570,32 +509,16 @@ class EditorActivity : AppCompatActivity() {
 
     private fun clearAssetTransfer() {
         pendingAssetTransfer = null
-        if (::noteAdapter.isInitialized) noteAdapter.setTransferTarget(null)
+        if (::noteAdapter.isInitialized) noteAdapter.setAssetPastePending(false)
     }
 
-    private fun remapLineAfterMove(
-        lineIndex: Int?,
-        source: Int,
-        destination: Int,
-        replacedBlank: Boolean
-    ): Int? {
-        lineIndex ?: return null
-        if (source == destination) return lineIndex
-        if (lineIndex == source) return destination
-
-        var mapped = if (lineIndex > source) lineIndex - 1 else lineIndex
-        if (!replacedBlank && mapped >= destination) mapped++
-        return mapped.coerceIn(0, document.size - 1)
-    }
-
-    private fun locateTransferSource(transfer: AssetTransfer): Int {
-        if (transfer.originalLine in 0 until document.size &&
-            transfer.assetPath in document[transfer.originalLine]
-        ) return transfer.originalLine
-        val pathMatches = document.snapshot().mapIndexedNotNull { index, line ->
-            index.takeIf { transfer.assetPath in line }
-        }
-        return pathMatches.singleOrNull() ?: document.snapshot().indexOf(transfer.source)
+    private fun showPasteAtBoundary(boundaryIndex: Int) {
+        if (pendingAssetTransfer == null) return
+        MaterialAlertDialogBuilder(this)
+            .setItems(arrayOf(getString(R.string.paste))) { _, _ ->
+                pasteAtBoundary(boundaryIndex)
+            }
+            .show()
     }
 
     private fun clipboardText(): String? {
@@ -625,7 +548,10 @@ class EditorActivity : AppCompatActivity() {
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         val remainingMarkdown = document.markdown()
-        val retainedClipboardReference = pendingAssetTransfer?.source.orEmpty()
+        val retainedClipboardReference = listOfNotNull(
+            pendingAssetTransfer?.source,
+            clipboardText()
+        ).joinToString("\n")
         io.execute {
             synchronized(workspaceLock) {
                 runCatching {
@@ -659,9 +585,7 @@ class EditorActivity : AppCompatActivity() {
 
     private data class AssetTransfer(
         val source: String,
-        val originalLine: Int,
-        val assetPath: String,
-        val move: Boolean
+        val assetPath: String
     )
 
     companion object {
