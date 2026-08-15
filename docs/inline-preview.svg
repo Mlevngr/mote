@@ -1,25 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
-  <rect width="900" height="560" fill="#fffdf8"/>
-  <rect x="0" y="0" width="900" height="64" fill="#f4f1ff"/>
-  <text x="32" y="41" font-family="sans-serif" font-size="27" font-weight="700" fill="#232328">InkNote</text>
-  <text x="650" y="39" font-family="sans-serif" font-size="19" fill="#4054b2">图片</text>
-  <text x="760" y="39" font-family="sans-serif" font-size="19" fill="#4054b2">PDF</text>
-  <rect x="24" y="88" width="405" height="440" rx="16" fill="#ffffff" stroke="#dddde5"/>
-  <text x="44" y="124" font-family="monospace" font-size="18" fill="#232328"># 课程笔记</text>
-  <text x="44" y="164" font-family="monospace" font-size="16" fill="#555560">这里是 **Markdown** 编辑区。</text>
-  <text x="44" y="208" font-family="monospace" font-size="15" fill="#555560">![实验图片](assets/image.png)</text>
-  <text x="44" y="250" font-family="monospace" font-size="15" fill="#555560">[讲义](assets/lesson.pdf)</text>
-  <text x="468" y="107" font-family="sans-serif" font-size="16" font-weight="700" fill="#666672">实时预览</text>
-  <text x="468" y="147" font-family="sans-serif" font-size="27" font-weight="700" fill="#232328">课程笔记</text>
-  <text x="468" y="181" font-family="sans-serif" font-size="17" fill="#33333a">这里是 <tspan font-weight="700">Markdown</tspan> 编辑区。</text>
-  <rect x="468" y="204" width="382" height="122" rx="12" fill="#cfe8dc"/>
-  <circle cx="545" cy="260" r="35" fill="#fff3b0"/>
-  <path d="M468 306 L560 244 L625 296 L700 230 L850 326 L468 326Z" fill="#709f88"/>
-  <text x="480" y="348" font-family="sans-serif" font-size="14" fill="#666672">实验图片</text>
-  <rect x="468" y="365" width="382" height="155" rx="8" fill="#ffffff" stroke="#c9c9d2"/>
-  <text x="485" y="392" font-family="sans-serif" font-size="13" fill="#666672">讲义  •  1/6</text>
-  <rect x="500" y="410" width="318" height="15" rx="3" fill="#dfe2f3"/>
-  <rect x="500" y="438" width="275" height="9" rx="3" fill="#dadade"/>
-  <rect x="500" y="459" width="300" height="9" rx="3" fill="#dadade"/>
-  <rect x="500" y="480" width="240" height="9" rx="3" fill="#dadade"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="780" viewBox="0 0 760 780">
+  <rect width="760" height="780" fill="#fffdf8"/>
+  <rect width="760" height="66" fill="#f4f1ff"/>
+  <text x="28" y="42" font-family="sans-serif" font-size="28" font-weight="700" fill="#232328">InkNote</text>
+  <text x="478" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">完成</text>
+  <text x="570" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">图片</text>
+  <text x="662" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">PDF</text>
+  <text x="28" y="95" font-family="sans-serif" font-size="14" fill="#777782">点击段落编辑，其余内容保持预览</text>
+
+  <text x="28" y="151" font-family="sans-serif" font-size="31" font-weight="700" fill="#232328">课程笔记</text>
+
+  <rect x="20" y="178" width="720" height="105" rx="14" fill="#ffffff" stroke="#4054b2" stroke-width="2"/>
+  <text x="38" y="211" font-family="monospace" font-size="16" fill="#4054b2">这一段正在编辑：</text>
+  <text x="38" y="245" font-family="monospace" font-size="18" fill="#232328">这里是 **Markdown** 源码。</text>
+  <line x1="38" y1="263" x2="290" y2="263" stroke="#4054b2" stroke-width="2"/>
+
+  <text x="28" y="326" font-family="sans-serif" font-size="18" fill="#232328">其他段落仍然是 <tspan font-weight="700">实时预览</tspan>，不会全部变成源码。</text>
+
+  <rect x="28" y="355" width="704" height="175" rx="14" fill="#cfe8dc"/>
+  <circle cx="170" cy="430" r="52" fill="#fff3b0"/>
+  <path d="M28 510 L190 397 L310 485 L430 390 L732 530 L28 530Z" fill="#709f88"/>
+  <text x="42" y="378" font-family="sans-serif" font-size="14" fill="#44564c">图片直接显示</text>
+
+  <rect x="28" y="558" width="704" height="190" rx="10" fill="#ffffff" stroke="#c9c9d2"/>
+  <text x="45" y="588" font-family="sans-serif" font-size="14" fill="#666672">课程讲义.pdf  •  1/6</text>
+  <rect x="70" y="615" width="620" height="18" rx="3" fill="#dfe2f3"/>
+  <rect x="70" y="651" width="545" height="10" rx="3" fill="#dadade"/>
+  <rect x="70" y="677" width="585" height="10" rx="3" fill="#dadade"/>
+  <rect x="70" y="703" width="455" height="10" rx="3" fill="#dadade"/>
 </svg>

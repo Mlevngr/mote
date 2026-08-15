@@ -4,25 +4,27 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.1.0 APK](https://github.com/Mlevngr/note/releases/download/v0.1.0/InkNote-0.1.0-debug.apk)**
+**[直接下载 InkNote 0.2.0 APK](https://github.com/Mlevngr/note/releases/download/v0.2.0/InkNote-0.2.0-debug.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用 Android Debug 签名，适合当前测试阶段直接安装。
 
-## 编辑与实时预览
+## 块级编辑与实时预览
 
-![InkNote 图片与 PDF 内嵌预览示意](docs/inline-preview.svg)
+![InkNote 块级编辑和图片/PDF内嵌预览示意](docs/inline-preview.svg)
 
-界面上半部分是 Markdown 源文，下半部分是约 140ms 防抖更新的实时预览：
+InkNote 使用混合编辑模式，而不是上下分栏：
 
-- 普通 Markdown 渲染为标题、正文、列表、引用、表格和任务列表。
-- 导入图片后，图片直接显示在预览中。
-- 导入 PDF 后，PDF 会展开为真实页面；预览列表仅渲染屏幕附近的页面。
-- GitHub 自己的 README 渲染器不会把 PDF 链接展开成页面，但 InkNote 的应用内预览会。
+- 默认所有段落都是渲染后的实时预览。
+- 点击一个段落时，仅该段落显示 Markdown 源码编辑框。
+- 点击另一个段落或“完成”，刚才的段落立即恢复渲染。
+- 图片直接显示；PDF 展开为真实页面，并只渲染屏幕附近页面。
+- GitHub README 不会把 PDF 链接展开成页面，但 InkNote 应用内会。
 
 ## 当前 MVP
 
 - Plain Markdown source stored as `note.md`
-- Debounced live preview while typing
+- Hybrid block editor: only the active block shows Markdown source
+- Every inactive block remains rendered as live preview
 - CommonMark rendering with headings, emphasis, lists, quotes, tables, task lists and strike-through
 - Image and PDF import through Android's system document picker
 - Imported images are rendered inline, not as links

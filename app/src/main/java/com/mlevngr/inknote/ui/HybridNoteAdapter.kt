@@ -4,16 +4,23 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.LruCache
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.getSystemService
 import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.textfield.TextInputEditText
+import com.mlevngr.inknote.R
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
@@ -23,8 +30,11 @@ import java.io.Closeable
 import java.io.File
 import java.util.concurrent.Executors
 
-class PreviewAdapter(private val context: Context) :
-    RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
+class HybridNoteAdapter(
+    private val context: Context,
+    private val onActivate: (Int) -> Unit,
+    private val onBlockChanged: (Int, String) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
         .usePlugin(StrikethroughPlugin.create())
@@ -37,32 +47,49 @@ class PreviewAdapter(private val context: Context) :
     private val bitmapCache = object : LruCache<String, Bitmap>(48 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
-    private var rows: List<PreviewRow> = emptyList()
+    private var rows: List<HybridRow> = emptyList()
+    private var focusBlock: Int? = null
     private val horizontalPadding = dp(18)
     private val targetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
 
-    fun submit(newRows: List<PreviewRow>) {
+    fun submit(newRows: List<HybridRow>, activeBlock: Int?) {
         rows = newRows
+        focusBlock = activeBlock
         notifyDataSetChanged()
     }
 
     override fun getItemCount(): Int = rows.size
 
-    override fun getItemViewType(position: Int): Int = when (rows[position]) {
-        is PreviewRow.Markdown -> TYPE_MARKDOWN
-        is PreviewRow.Image -> TYPE_IMAGE
-        is PreviewRow.PdfPage -> TYPE_PDF
-        is PreviewRow.Error -> TYPE_ERROR
+    override fun getItemViewType(position: Int): Int = when (val row = rows[position]) {
+        is HybridRow.Editor -> TYPE_EDITOR
+        is HybridRow.Rendered -> when (row.preview) {
+            is PreviewRow.Markdown -> TYPE_MARKDOWN
+            is PreviewRow.Image -> TYPE_IMAGE
+            is PreviewRow.PdfPage -> TYPE_PDF
+            is PreviewRow.Error -> TYPE_ERROR
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
         when (viewType) {
+            TYPE_EDITOR -> EditorHolder(TextInputEditText(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(horizontalPadding, dp(12), horizontalPadding, dp(12))
+                setBackgroundResource(R.drawable.editor_background)
+                typeface = Typeface.MONOSPACE
+                textSize = 16f
+                minHeight = dp(64)
+                gravity = Gravity.TOP or Gravity.START
+            })
             TYPE_MARKDOWN, TYPE_ERROR -> TextHolder(TextView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                setPadding(horizontalPadding, dp(8), horizontalPadding, dp(8))
+                setPadding(horizontalPadding, dp(10), horizontalPadding, dp(10))
                 textSize = 17f
                 setTextIsSelectable(true)
             })
@@ -79,25 +106,45 @@ class PreviewAdapter(private val context: Context) :
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
-            is PreviewRow.Markdown -> {
-                holder as TextHolder
-                holder.text.setTextColor(Color.rgb(35, 35, 40))
-                markwon.setMarkdown(holder.text, row.source)
+            is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
+            is HybridRow.Rendered -> {
+                holder.itemView.setOnClickListener { onActivate(row.blockIndex) }
+                when (val preview = row.preview) {
+                    is PreviewRow.Markdown -> {
+                        holder as TextHolder
+                        holder.text.setTextColor(Color.rgb(35, 35, 40))
+                        markwon.setMarkdown(holder.text, preview.source)
+                    }
+                    is PreviewRow.Error -> {
+                        holder as TextHolder
+                        holder.text.setTextColor(Color.rgb(180, 45, 45))
+                        holder.text.text = preview.message
+                    }
+                    is PreviewRow.Image -> bindImage(holder as AssetHolder, preview)
+                    is PreviewRow.PdfPage -> bindPdf(holder as AssetHolder, preview)
+                }
             }
-            is PreviewRow.Error -> {
-                holder as TextHolder
-                holder.text.setTextColor(Color.rgb(180, 45, 45))
-                holder.text.text = row.message
-            }
-            is PreviewRow.Image -> bindImage(holder as AssetHolder, row)
-            is PreviewRow.PdfPage -> bindPdf(holder as AssetHolder, row)
         }
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is EditorHolder) holder.detachWatcher()
         if (holder is AssetHolder) {
             holder.image.tag = null
             holder.image.setImageDrawable(null)
+        }
+    }
+
+    private fun bindEditor(holder: EditorHolder, row: HybridRow.Editor) {
+        holder.bind(row.blockIndex, row.source, onBlockChanged)
+        if (focusBlock == row.blockIndex) {
+            focusBlock = null
+            holder.editor.post {
+                holder.editor.requestFocus()
+                holder.editor.setSelection(holder.editor.text?.length ?: 0)
+                context.getSystemService<InputMethodManager>()
+                    ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
+            }
         }
     }
 
@@ -156,6 +203,37 @@ class PreviewAdapter(private val context: Context) :
     private fun dp(value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
 
+    private class EditorHolder(val editor: TextInputEditText) : RecyclerView.ViewHolder(editor) {
+        private var watcher: TextWatcher? = null
+
+        fun bind(blockIndex: Int, source: String, onChanged: (Int, String) -> Unit) {
+            detachWatcher()
+            if (editor.text?.toString() != source) editor.setText(source)
+            watcher = object : TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) = Unit
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) = onChanged(blockIndex, s?.toString().orEmpty())
+
+                override fun afterTextChanged(s: Editable?) = Unit
+            }.also(editor::addTextChangedListener)
+        }
+
+        fun detachWatcher() {
+            watcher?.let(editor::removeTextChangedListener)
+            watcher = null
+        }
+    }
+
     private class TextHolder(val text: TextView) : RecyclerView.ViewHolder(text)
 
     private class AssetHolder(container: LinearLayout) : RecyclerView.ViewHolder(container) {
@@ -184,9 +262,10 @@ class PreviewAdapter(private val context: Context) :
     }
 
     private companion object {
-        const val TYPE_MARKDOWN = 0
-        const val TYPE_IMAGE = 1
-        const val TYPE_PDF = 2
-        const val TYPE_ERROR = 3
+        const val TYPE_EDITOR = 0
+        const val TYPE_MARKDOWN = 1
+        const val TYPE_IMAGE = 2
+        const val TYPE_PDF = 3
+        const val TYPE_ERROR = 4
     }
 }

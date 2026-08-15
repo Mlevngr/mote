@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">InkNote</string>
-    <string name="markdown_label">Markdown</string>
-    <string name="preview_label">实时预览</string>
+    <string name="hybrid_edit_hint">点击段落编辑，其余内容保持预览</string>
+    <string name="finish_editing">完成</string>
     <string name="import_image">图片</string>
     <string name="import_pdf">PDF</string>
     <string name="import_failed">导入失败：%1$s</string>
