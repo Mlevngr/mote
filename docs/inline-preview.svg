@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
   <rect width="900" height="560" rx="28" fill="#f5f4f8"/>
   <rect x="40" y="30" width="820" height="68" rx="18" fill="#ffffff"/>
-  <text x="72" y="74" font-family="sans-serif" font-size="26" font-weight="700" fill="#24232a">InkNote</text>
+  <text x="72" y="74" font-family="sans-serif" font-size="26" font-weight="700" fill="#24232a">Mote</text>
   <path d="M721 63h38M730 51a13 13 0 0 0 0 24M750 51a13 13 0 0 1 0 24" stroke="#34313d" stroke-width="4" fill="none" stroke-linecap="round"/>
   <path d="M803 73l-13 3 3-13 18-18 10 10z" fill="#34313d"/>
   <text x="63" y="151" font-family="sans-serif" font-size="34" font-weight="700" fill="#222129">行级 Markdown 笔记</text>

@@ -1,10 +1,10 @@
-# InkNote Android
+# Mote Android
 
 一个独立、离线优先的 Android Markdown 笔记应用。
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.7.6 APK](https://github.com/Mlevngr/note/releases/download/v0.7.6/InkNote-0.7.6.apk)**
+**[直接下载 Mote 0.7.7 APK](https://github.com/Mlevngr/note/releases/download/v0.7.7/Mote-0.7.7.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -14,9 +14,9 @@
 
 ## 行级编辑与实时预览
 
-![InkNote 行级编辑和文件内嵌预览示意](docs/inline-preview.svg)
+![Mote 行级编辑和文件内嵌预览示意](docs/inline-preview.svg)
 
-InkNote 有清晰的阅读、编辑两种模式：
+Mote 有清晰的阅读、编辑两种模式：
 
 - 笔记文件名就是标题；顶部标题与 Markdown 正文是两个独立编辑区域。
 - 在编辑模式下可直接修改标题，修改后会同步重命名笔记；正文行首退格不会删入标题。
@@ -66,7 +66,7 @@ InkNote 有清晰的阅读、编辑两种模式：
 
 主页右上角的调色板按钮可以即时调整外观，设置会在下次启动时保留：
 
-- 内置 InkNote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题，每套主题都有独立的明亮/深色配色，并同时覆盖笔记库、编辑器、预览、对话框和系统栏。
+- 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题，每套主题都有独立的明亮/深色配色，并同时覆盖笔记库、编辑器、预览、对话框和系统栏。
 - Samsung 风格默认将文件夹以双列卡片置于上方，笔记在下方保持易扫读的列表；也可切换为紧凑列表或双列缩略图网格。
 - 笔记预览分为三种独立模式：“第一页渲染预览”会生成包含标题、Markdown 样式、图片和 PDF 首页的页面缩小图；“正文摘要”只显示可扫读的文本摘要；“仅显示标题”用于最紧凑的目录。
 - 页面缩略图在后台生成并按笔记修改时间、主题和尺寸缓存，不阻塞目录滚动；旧版“首页图片与摘要”设置会自动迁移到第一页渲染预览。
@@ -88,7 +88,7 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 其他文件显示为附件卡片。
 - 所有文件都会复制到当前笔记的私有 `assets/` 目录；笔记不会依赖原文件 URI，也不会创建可点击的外部链接。
 
-InkNote 使用非链接的本地嵌入指令：
+Mote 使用非链接的本地嵌入指令：
 
 ```markdown
 ![[asset:assets/uuid.png|照片]]
