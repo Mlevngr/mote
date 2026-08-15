@@ -1,6 +1,7 @@
 package com.mlevngr.inknote.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.io.File
 
@@ -14,7 +15,10 @@ class AssetPreviewVisibilityTest {
             )
         }
 
-        val visible = AssetPreviewVisibility.visibleRows(rows, setOf(pdf.canonicalPath))
+        val visible = AssetPreviewVisibility.visibleRows(
+            rows,
+            setOf(AssetPreviewVisibility.AssetInstanceKey(2, pdf.canonicalPath))
+        )
 
         assertEquals(1, visible.size)
         assertEquals(0, ((visible.single() as HybridRow.Rendered).preview as PreviewRow.PdfPage).pageIndex)
@@ -42,7 +46,39 @@ class AssetPreviewVisibilityTest {
 
         assertEquals(
             3,
-            AssetPreviewVisibility.visibleRows(rows, setOf(first.canonicalPath)).size
+            AssetPreviewVisibility.visibleRows(
+                rows,
+                setOf(AssetPreviewVisibility.AssetInstanceKey(0, first.canonicalPath))
+            ).size
+        )
+    }
+
+    @Test fun repeatedReferencesToTheSamePdfCollapseIndependently() {
+        val pdf = File("/tmp/repeated.pdf")
+        val rows = listOf(
+            HybridRow.Rendered(1, PreviewRow.PdfPage(pdf, "First", 0, 2)),
+            HybridRow.Rendered(1, PreviewRow.PdfPage(pdf, "First", 1, 2)),
+            HybridRow.Rendered(4, PreviewRow.PdfPage(pdf, "Second", 0, 2)),
+            HybridRow.Rendered(4, PreviewRow.PdfPage(pdf, "Second", 1, 2))
+        )
+
+        val visible = AssetPreviewVisibility.visibleRows(
+            rows,
+            setOf(AssetPreviewVisibility.AssetInstanceKey(1, pdf.canonicalPath))
+        )
+
+        assertEquals(3, visible.size)
+        assertEquals(listOf(1, 4, 4), visible.map(HybridRow::lineIndex))
+    }
+
+    @Test fun repeatedReferencesToTheSameImageHaveIndependentKeys() {
+        val image = File("/tmp/repeated.jpg")
+        val first = HybridRow.Rendered(1, PreviewRow.Image(image, "First"))
+        val second = HybridRow.Rendered(4, PreviewRow.Image(image, "Second"))
+
+        assertNotEquals(
+            AssetPreviewVisibility.assetKey(first),
+            AssetPreviewVisibility.assetKey(second)
         )
     }
 }

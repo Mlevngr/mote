@@ -31,6 +31,7 @@ import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.pdf.PdfDocumentSource
+import com.mlevngr.inknote.ui.AssetPreviewVisibility.AssetInstanceKey
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
@@ -66,7 +67,7 @@ class HybridNoteAdapter(
     }
     private var allRows: List<HybridRow> = emptyList()
     private var rows: List<HybridRow> = emptyList()
-    private val collapsedAssetPaths = mutableSetOf<String>()
+    private val collapsedAssets = mutableSetOf<AssetInstanceKey>()
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
     private var editing = false
@@ -80,9 +81,8 @@ class HybridNoteAdapter(
         focusCursor: Int? = null
     ) {
         allRows = newRows
-        val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetFile)
-            .mapTo(mutableSetOf()) { it.canonicalPath }
-        collapsedAssetPaths.retainAll(availableAssets)
+        val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetKey).toSet()
+        collapsedAssets.retainAll(availableAssets)
         rebuildVisibleRows()
         this.editing = editing
         this.focusLine = focusLine
@@ -228,7 +228,7 @@ class HybridNoteAdapter(
                             preview.file,
                             preview.label.ifBlank { preview.file.name }
                         )
-                        bindImage(holder, preview)
+                        bindImage(holder, row.lineIndex, preview)
                     }
                     is PreviewRow.PdfPage -> {
                         holder as AssetHolder
@@ -240,7 +240,7 @@ class HybridNoteAdapter(
                             preview.file,
                             preview.label.ifBlank { preview.file.name }
                         )
-                        bindPdf(holder, preview)
+                        bindPdf(holder, row.lineIndex, preview)
                     }
                 }
             }
@@ -320,9 +320,15 @@ class HybridNoteAdapter(
         }
     }
 
-    private fun bindImage(holder: AssetHolder, row: PreviewRow.Image) {
-        val collapsed = isCollapsed(row.file)
-        bindAssetHeader(holder, row.file, row.label.ifBlank { row.file.name }, collapsed)
+    private fun bindImage(holder: AssetHolder, lineIndex: Int, row: PreviewRow.Image) {
+        val collapsed = isCollapsed(lineIndex, row.file)
+        bindAssetHeader(
+            holder,
+            lineIndex,
+            row.file,
+            row.label.ifBlank { row.file.name },
+            collapsed
+        )
         holder.image.visibility = if (collapsed) View.GONE else View.VISIBLE
         if (collapsed) {
             holder.image.tag = null
@@ -333,14 +339,14 @@ class HybridNoteAdapter(
         loadBitmap(holder, key) { decodeImage(row.file, targetWidth) }
     }
 
-    private fun bindPdf(holder: AssetHolder, row: PreviewRow.PdfPage) {
-        val collapsed = isCollapsed(row.file)
+    private fun bindPdf(holder: AssetHolder, lineIndex: Int, row: PreviewRow.PdfPage) {
+        val collapsed = isCollapsed(lineIndex, row.file)
         val pageLabel = if (collapsed) {
             "${row.label}  •  ${context.getString(R.string.pdf_page_count, row.pageCount)}"
         } else {
             "${row.label}  •  ${row.pageIndex + 1}/${row.pageCount}"
         }
-        bindAssetHeader(holder, row.file, pageLabel, collapsed)
+        bindAssetHeader(holder, lineIndex, row.file, pageLabel, collapsed)
         holder.image.visibility = if (collapsed) View.GONE else View.VISIBLE
         if (collapsed) {
             holder.image.tag = null
@@ -358,6 +364,7 @@ class HybridNoteAdapter(
 
     private fun bindAssetHeader(
         holder: AssetHolder,
+        lineIndex: Int,
         file: File,
         label: String,
         collapsed: Boolean
@@ -367,7 +374,7 @@ class HybridNoteAdapter(
             if (collapsed) R.string.expand_preview else R.string.collapse_preview,
             label
         )
-        holder.caption.setOnClickListener { toggleAsset(file) }
+        holder.caption.setOnClickListener { toggleAsset(lineIndex, file) }
     }
 
     private fun bindAssetActions(
@@ -387,17 +394,21 @@ class HybridNoteAdapter(
         menuView?.setOnClickListener { onAssetActions(lineIndex, file, label) }
     }
 
-    private fun isCollapsed(file: File): Boolean = file.canonicalPath in collapsedAssetPaths
+    private fun assetKey(lineIndex: Int, file: File) =
+        AssetInstanceKey(lineIndex, file.canonicalPath)
 
-    private fun toggleAsset(file: File) {
-        val key = file.canonicalPath
-        if (!collapsedAssetPaths.add(key)) collapsedAssetPaths.remove(key)
+    private fun isCollapsed(lineIndex: Int, file: File): Boolean =
+        assetKey(lineIndex, file) in collapsedAssets
+
+    private fun toggleAsset(lineIndex: Int, file: File) {
+        val key = assetKey(lineIndex, file)
+        if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
         rebuildVisibleRows()
         notifyDataSetChanged()
     }
 
     private fun rebuildVisibleRows() {
-        rows = AssetPreviewVisibility.visibleRows(allRows, collapsedAssetPaths)
+        rows = AssetPreviewVisibility.visibleRows(allRows, collapsedAssets)
     }
 
     private fun loadBitmap(holder: AssetHolder, key: String, loader: () -> Bitmap) {

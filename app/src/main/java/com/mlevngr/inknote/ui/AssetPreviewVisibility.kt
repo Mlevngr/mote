@@ -1,19 +1,23 @@
 package com.mlevngr.inknote.ui
 
-import java.io.File
-
 object AssetPreviewVisibility {
-    fun assetFile(row: HybridRow): File? = when (val preview = (row as? HybridRow.Rendered)?.preview) {
-        is PreviewRow.Image -> preview.file
-        is PreviewRow.PdfPage -> preview.file
-        else -> null
-    }
+    data class AssetInstanceKey(val lineIndex: Int, val canonicalPath: String)
 
-    fun visibleRows(rows: List<HybridRow>, collapsedAssetPaths: Set<String>): List<HybridRow> =
+    fun assetKey(row: HybridRow): AssetInstanceKey? =
+        when (val preview = (row as? HybridRow.Rendered)?.preview) {
+            is PreviewRow.Image -> AssetInstanceKey(row.lineIndex, preview.file.canonicalPath)
+            is PreviewRow.PdfPage -> AssetInstanceKey(row.lineIndex, preview.file.canonicalPath)
+            else -> null
+        }
+
+    fun visibleRows(
+        rows: List<HybridRow>,
+        collapsedAssets: Set<AssetInstanceKey>,
+    ): List<HybridRow> =
         rows.filter { row ->
             val preview = (row as? HybridRow.Rendered)?.preview
             preview !is PreviewRow.PdfPage ||
-                preview.file.canonicalPath !in collapsedAssetPaths ||
+                assetKey(row) !in collapsedAssets ||
                 preview.pageIndex == 0
         }
 }
