@@ -2,7 +2,13 @@
 <resources>
     <style name="Theme.InkNote" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorSurface">@color/app_background</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOutline">@color/editor_border</item>
         <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:navigationBarColor">@color/app_background</item>
