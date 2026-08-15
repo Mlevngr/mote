@@ -107,6 +107,9 @@ class NoteLibrary internal constructor(private val root: File) {
         check(note.deleteRecursively() && !note.exists()) { "无法删除笔记" }
     }
 
+    fun renameNote(folderPath: String, noteName: String, requestedName: String): Entry =
+        noteEntry(renameChild(folderPath, noteName, requestedName, EntryType.Note))
+
     fun findFolder(parentPath: String, folderName: String): Entry =
         folderEntry(findChild(parentPath, folderName, EntryType.Folder))
 
@@ -120,6 +123,9 @@ class NoteLibrary internal constructor(private val root: File) {
         val folder = findChild(parentPath, folderName, EntryType.Folder)
         check(folder.deleteRecursively() && !folder.exists()) { "无法删除文件夹" }
     }
+
+    fun renameFolder(parentPath: String, folderName: String, requestedName: String): Entry =
+        folderEntry(renameChild(parentPath, folderName, requestedName, EntryType.Folder))
 
     fun parentOf(folderPath: String): String? {
         if (folderPath.isBlank()) return null
@@ -173,6 +179,35 @@ class NoteLibrary internal constructor(private val root: File) {
             if (type == EntryType.Note) "笔记不存在或已经移动" else "文件夹不存在或已经移动"
         }
         return matches.single()
+    }
+
+    private fun renameChild(
+        parentPath: String,
+        currentName: String,
+        requestedName: String,
+        type: EntryType
+    ): File {
+        val source = findChild(parentPath, currentName, type)
+        val newName = normalizedName(requestedName, stripMarkdownExtension = type == EntryType.Note)
+        if (newName == displayName(source, type)) return source
+
+        val parent = requireNotNull(source.parentFile)
+        val duplicate = parent.listFiles().orEmpty().any { child ->
+            if (!child.isDirectory || child == source) return@any false
+            val childType = if (File(child, NOTE_FILE).isFile) EntryType.Note else EntryType.Folder
+            childType == type && displayName(child, childType) == newName
+        }
+        require(!duplicate) {
+            if (type == EntryType.Note) "同名笔记已存在" else "同名文件夹已存在"
+        }
+
+        val marker = if (type == EntryType.Note) NOTE_DIRECTORY_SUFFIX else FOLDER_DIRECTORY_SUFFIX
+        val destination = File(parent, "$newName$marker")
+        require(!destination.exists()) { "目标名称已被占用" }
+        check(source.renameTo(destination)) {
+            if (type == EntryType.Note) "无法重命名笔记" else "无法重命名文件夹"
+        }
+        return destination
     }
 
     private fun normalizedName(requestedName: String, stripMarkdownExtension: Boolean): String {

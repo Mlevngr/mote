@@ -168,22 +168,89 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEntryActions(entry: NoteLibrary.Entry) {
         val actions = if (entry.type == NoteLibrary.EntryType.Note) {
-            arrayOf(getString(R.string.move_note), getString(R.string.delete_note))
+            arrayOf(
+                getString(R.string.rename_note),
+                getString(R.string.move_note),
+                getString(R.string.delete_note)
+            )
         } else {
-            arrayOf(getString(R.string.delete_folder))
+            arrayOf(getString(R.string.rename_folder), getString(R.string.delete_folder))
         }
         MaterialAlertDialogBuilder(this)
             .setTitle(entry.name)
             .setItems(actions) { _, which ->
                 when (entry.type) {
                     NoteLibrary.EntryType.Note -> when (which) {
-                        0 -> showMoveDialog(entry)
-                        1 -> showDeleteNoteConfirmation(entry)
+                        0 -> showRenameDialog(entry)
+                        1 -> showMoveDialog(entry)
+                        2 -> showDeleteNoteConfirmation(entry)
                     }
-                    NoteLibrary.EntryType.Folder -> showDeleteFolderConfirmation(entry)
+                    NoteLibrary.EntryType.Folder -> when (which) {
+                        0 -> showRenameDialog(entry)
+                        1 -> showDeleteFolderConfirmation(entry)
+                    }
                 }
             }
             .show()
+    }
+
+    private fun showRenameDialog(entry: NoteLibrary.Entry) {
+        val input = TextInputEditText(this).apply {
+            setSingleLine()
+            setText(entry.name)
+            setSelection(text?.length ?: 0)
+        }
+        val inputLayout = TextInputLayout(this).apply {
+            hint = getString(
+                if (entry.type == NoteLibrary.EntryType.Note) R.string.note_name
+                else R.string.folder_name
+            )
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            addView(input, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+        val margin = (24 * resources.displayMetrics.density).toInt()
+        val container = FrameLayout(this).apply {
+            addView(inputLayout, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = margin
+                marginEnd = margin
+                topMargin = margin / 2
+            })
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(
+                if (entry.type == NoteLibrary.EntryType.Note) R.string.rename_note
+                else R.string.rename_folder
+            )
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.rename, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                runCatching {
+                    when (entry.type) {
+                        NoteLibrary.EntryType.Note ->
+                            library.renameNote(currentFolder, entry.name, input.text.toString())
+                        NoteLibrary.EntryType.Folder ->
+                            library.renameFolder(currentFolder, entry.name, input.text.toString())
+                    }
+                }.onSuccess {
+                    dialog.dismiss()
+                    refresh()
+                    Toast.makeText(this, R.string.renamed, Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    inputLayout.error = it.message ?: getString(R.string.rename_failed)
+                }
+            }
+        }
+        dialog.show()
+        input.requestFocus()
     }
 
     private fun showDeleteNoteConfirmation(note: NoteLibrary.Entry) {

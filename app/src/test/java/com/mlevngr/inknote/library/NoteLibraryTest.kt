@@ -204,4 +204,59 @@ class NoteLibraryTest {
         assertNull(NotePathPolicy.resolve(root, "../${lookalike.name}"))
         assertNull(NotePathPolicy.resolve(root, lookalike.absolutePath))
     }
+
+    @Test fun renamesNoteAndKeepsMarkdownAndAssets() {
+        val (root, library) = library()
+        val note = library.createNote("", "Draft")
+        File(root, "${note.relativePath}/note.md").writeText("custom markdown")
+        File(root, "${note.relativePath}/assets/photo.jpg").writeText("image")
+
+        val renamed = library.renameNote("", note.name, "Final.md")
+
+        assertEquals("Final", renamed.name)
+        assertEquals("Final.note", renamed.relativePath)
+        assertEquals("custom markdown", File(root, "Final.note/note.md").readText())
+        assertEquals("image", File(root, "Final.note/assets/photo.jpg").readText())
+        assertTrue(!File(root, note.relativePath).exists())
+    }
+
+    @Test fun renamesFolderAndKeepsNestedNotes() {
+        val (root, library) = library()
+        val folder = library.createFolder("", "Old")
+        library.createNote(folder.relativePath, "Nested")
+
+        val renamed = library.renameFolder("", folder.name, "New")
+
+        assertEquals("New", renamed.name)
+        assertTrue(File(root, "New.folder/Nested.note/note.md").isFile)
+        assertEquals(listOf("Nested"), library.list(renamed.relativePath).map { it.name })
+    }
+
+    @Test fun renameAllowsNoteAndFolderToShareDisplayName() {
+        val (_, library) = library()
+        val folder = library.createFolder("", "Shared")
+        val note = library.createNote("", "Draft")
+
+        val renamed = library.renameNote("", note.name, folder.name)
+
+        assertEquals("Shared", renamed.name)
+        assertEquals(
+            listOf(NoteLibrary.EntryType.Folder, NoteLibrary.EntryType.Note),
+            library.list("").map { it.type }
+        )
+    }
+
+    @Test fun renameRefusesSameTypeCollisionWithoutOverwriting() {
+        val (root, library) = library()
+        val first = library.createNote("", "First")
+        val second = library.createNote("", "Second")
+        File(root, "${first.relativePath}/note.md").writeText("first")
+        File(root, "${second.relativePath}/note.md").writeText("second")
+
+        val failure = runCatching { library.renameNote("", second.name, first.name) }.exceptionOrNull()
+
+        assertEquals("同名笔记已存在", failure?.message)
+        assertEquals("first", File(root, "${first.relativePath}/note.md").readText())
+        assertEquals("second", File(root, "${second.relativePath}/note.md").readText())
+    }
 }
