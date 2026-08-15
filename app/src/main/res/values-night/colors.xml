@@ -11,10 +11,11 @@
     <color name="text_secondary">#BDC1C6</color>
     <color name="error_text">#FFB4AB</color>
     <color name="launcher_background">#000000</color>
-    <color name="launcher_page">#8AB4F8</color>
-    <color name="launcher_spine">#FDD663</color>
-    <color name="launcher_lines">#202124</color>
-    <color name="launcher_pen">#81C995</color>
-    <color name="launcher_eraser">#F28B82</color>
-    <color name="launcher_tip">#202124</color>
+    <color name="launcher_shadow">#8059679F</color>
+    <color name="launcher_page">#242733</color>
+    <color name="launcher_spine">#6979B8</color>
+    <color name="launcher_lines">#BEC7F2</color>
+    <color name="launcher_pen">#FFC260</color>
+    <color name="launcher_eraser">#FF8A7A</color>
+    <color name="launcher_tip">#E2E6FF</color>
 </resources>
