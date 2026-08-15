@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.4.3 APK](https://github.com/Mlevngr/note/releases/download/v0.4.3/InkNote-0.4.3.apk)**
+**[直接下载 InkNote 0.5.0 APK](https://github.com/Mlevngr/note/releases/download/v0.5.0/InkNote-0.5.0.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -36,6 +36,17 @@ InkNote 有清晰的阅读、编辑两种模式：
 59:BD:95:A3:7B:99:16:C7:DC:07:3C:AF:54:47:4E:5F:ED:5E:A1:12:27:0D:A2:2F:7D:F1:4C:33:69:2E:D1:2D
 ```
 
+## 笔记库与文件夹
+
+应用启动后首先进入笔记库，而不是直接打开固定笔记：
+
+- 右上角分别提供“新建文件夹”和“新建笔记”。
+- 文件夹可以嵌套，工具栏显示当前位置并提供返回上级按钮。
+- 文件夹始终排在笔记前面；点击文件夹进入，点击笔记打开编辑器。
+- 重名项目会自动生成为 `名称 (2)`，不会覆盖已有内容。
+- 旧版本的 `welcome` 笔记会自动出现在根目录，不迁移、不删除原数据。
+- 目录路径经过规范化检查，不能通过名称越过笔记库目录。
+
 ## 文件插入
 
 插入按钮使用 Android 系统文件选择器，并根据所选文件自动处理：
@@ -58,6 +69,7 @@ InkNote 使用非链接的本地嵌入指令：
 ## 当前 MVP
 
 - 行级混合 Markdown 编辑
+- 多笔记、嵌套文件夹与笔记选择界面
 - CommonMark、标题、强调、单行列表/引用、任务项和删除线渲染
 - 图片、PDF 与普通附件的统一导入
 - 文件复制到笔记私有目录，无存储权限、无网络依赖
@@ -66,18 +78,20 @@ InkNote 使用非链接的本地嵌入指令：
 ## 本地数据结构
 
 ```text
-files/notes/welcome/
-├── note.md
-└── assets/
-    ├── uuid.png
-    ├── uuid.pdf
-    └── uuid.zip
+files/notes/
+├── welcome/
+│   ├── note.md
+│   └── assets/
+└── 工作/
+    └── 计划/
+        ├── note.md
+        └── assets/
 ```
 
 ## 构建
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleRelease
 ```
 
-当前里程碑使用一个本地笔记。多笔记管理、手写、PDF 标注和套索编辑属于后续里程碑。
+手写、PDF 标注和套索编辑属于后续里程碑。

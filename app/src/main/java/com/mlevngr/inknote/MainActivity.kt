@@ -1,264 +1,131 @@
 package com.mlevngr.inknote
 
-import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
-import androidx.core.content.getSystemService
-import androidx.core.graphics.Insets
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
-import com.mlevngr.inknote.assets.NoteWorkspace
-import com.mlevngr.inknote.markdown.MarkdownDocument
-import com.mlevngr.inknote.ui.HybridNoteAdapter
-import com.mlevngr.inknote.ui.HybridRowFactory
-import com.mlevngr.inknote.ui.PreviewRowFactory
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.mlevngr.inknote.library.NoteLibrary
+import com.mlevngr.inknote.ui.NoteLibraryAdapter
+import com.mlevngr.inknote.ui.SystemBarInsets
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var workspace: NoteWorkspace
-    private lateinit var document: MarkdownDocument
-    private lateinit var noteAdapter: HybridNoteAdapter
-    private lateinit var rowFactory: HybridRowFactory
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var modeButton: AppCompatImageButton
-    private val io = Executors.newSingleThreadExecutor()
-    private val main = Handler(Looper.getMainLooper())
-    private val renderRevision = AtomicInteger()
-    private var mode = EditorMode.Read
-    private var activeLine: Int? = null
-    private var lastActiveLine = 0
-    private var saveTask: Runnable? = null
-
-    private val openAsset = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(::importAsset)
-    }
+    private lateinit var library: NoteLibrary
+    private lateinit var adapter: NoteLibraryAdapter
+    private lateinit var toolbar: MaterialToolbar
+    private lateinit var emptyView: TextView
+    private var currentFolder = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        installSystemBarInsets()
+        setContentView(R.layout.activity_library)
+        SystemBarInsets.install(findViewById(R.id.library_root))
 
-        workspace = NoteWorkspace(this)
-        document = MarkdownDocument.parse(workspace.load(DEFAULT_NOTE))
-        rowFactory = HybridRowFactory(PreviewRowFactory(workspace))
-        noteAdapter = HybridNoteAdapter(
-            context = this,
-            onActivate = ::activateLine,
-            onLongActivate = ::enterEditModeAt,
-            onLineChanged = ::updateLine,
-            onSplitLine = ::splitLine,
-            onMultilineInput = ::replaceLineFromEditor,
-            onMergeWithPrevious = ::mergeWithPrevious
-        )
-
-        findViewById<MaterialToolbar>(R.id.toolbar).title = getString(R.string.app_name)
-        recyclerView = findViewById<RecyclerView>(R.id.note_content).apply {
+        library = NoteLibrary(this)
+        currentFolder = savedInstanceState?.getString(STATE_FOLDER).orEmpty()
+        adapter = NoteLibraryAdapter(this, ::openEntry)
+        toolbar = findViewById(R.id.library_toolbar)
+        emptyView = findViewById(R.id.empty_library)
+        findViewById<RecyclerView>(R.id.library_list).apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = noteAdapter
+            adapter = this@MainActivity.adapter
             itemAnimator = null
         }
-        modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
-            it.setOnClickListener { toggleMode() }
+        findViewById<AppCompatImageButton>(R.id.create_folder).setOnClickListener {
+            showCreateDialog(CreateType.Folder)
         }
-        findViewById<AppCompatImageButton>(R.id.insert_asset).setOnClickListener {
-            openAsset.launch(arrayOf("*/*"))
+        findViewById<AppCompatImageButton>(R.id.create_note).setOnClickListener {
+            showCreateDialog(CreateType.Note)
         }
-        updateModeButton()
+        toolbar.setNavigationOnClickListener { navigateUp() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (mode == EditorMode.Edit) {
-                    enterReadMode()
-                } else {
+                if (currentFolder.isNotBlank()) navigateUp()
+                else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
                 }
             }
         })
-        refreshRows()
+        refresh()
     }
 
-    private fun toggleMode() {
-        if (mode == EditorMode.Read) enterEditMode() else enterReadMode()
+    override fun onResume() {
+        super.onResume()
+        if (::adapter.isInitialized) refresh()
     }
 
-    private fun enterEditMode() {
-        enterEditModeAt(lastActiveLine)
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(STATE_FOLDER, currentFolder)
+        super.onSaveInstanceState(outState)
     }
 
-    private fun enterEditModeAt(lineIndex: Int) {
-        mode = EditorMode.Edit
-        activeLine = lineIndex.coerceIn(0, document.size - 1)
-        lastActiveLine = activeLine ?: 0
-        updateModeButton()
-        refreshRows(requestFocus = true)
-    }
-
-    private fun installSystemBarInsets() {
-        val root = findViewById<android.view.View>(R.id.app_root)
-        val initial = Insets.of(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
-            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(
-                initial.left + bars.left,
-                initial.top + bars.top,
-                initial.right + bars.right,
-                initial.bottom + bars.bottom
-            )
-            windowInsets
+    private fun refresh() {
+        val entries = runCatching { library.list(currentFolder) }.getOrElse {
+            currentFolder = ""
+            library.list("")
         }
-        ViewCompat.requestApplyInsets(root)
+        adapter.submit(entries)
+        emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
+        else android.view.View.GONE
+        toolbar.title = currentFolder.substringAfterLast('/').ifBlank { getString(R.string.app_name) }
+        toolbar.navigationIcon = if (currentFolder.isBlank()) null
+        else getDrawable(R.drawable.ic_arrow_back_24)
+        toolbar.navigationContentDescription = getString(R.string.go_up)
     }
 
-    private fun enterReadMode() {
-        mode = EditorMode.Read
-        activeLine?.let { lastActiveLine = it }
-        activeLine = null
-        getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(recyclerView.windowToken, 0)
-        recyclerView.clearFocus()
-        updateModeButton()
-        refreshRows()
-        scheduleSave()
-    }
-
-    private fun updateModeButton() {
-        val reading = mode == EditorMode.Read
-        modeButton.setImageResource(if (reading) R.drawable.ic_edit_24 else R.drawable.ic_read_mode_24)
-        modeButton.contentDescription = getString(
-            if (reading) R.string.switch_to_edit_mode else R.string.switch_to_read_mode
-        )
-    }
-
-    private fun activateLine(index: Int) {
-        if (mode != EditorMode.Edit || activeLine == index) return
-        activeLine = index
-        lastActiveLine = index
-        refreshRows(requestFocus = true)
-    }
-
-    private fun updateLine(index: Int, source: String) {
-        if (index !in 0 until document.size) return
-        document.update(index, source)
-        scheduleSave()
-    }
-
-    private fun splitLine(index: Int, cursor: Int) {
-        if (mode != EditorMode.Edit || index !in 0 until document.size) return
-        activeLine = document.splitLine(index, cursor)
-        lastActiveLine = activeLine ?: index
-        refreshRows(requestFocus = true, cursorPosition = 0)
-        scheduleSave()
-    }
-
-    private fun mergeWithPrevious(index: Int): Boolean {
-        if (mode != EditorMode.Edit) return false
-        val cursor = document.mergeWithPrevious(index) ?: return false
-        activeLine = index - 1
-        lastActiveLine = activeLine ?: 0
-        refreshRows(requestFocus = true, cursorPosition = cursor)
-        scheduleSave()
-        return true
-    }
-
-    private fun replaceLineFromEditor(index: Int, source: String, cursor: Int) {
-        if (mode != EditorMode.Edit || index !in 0 until document.size) return
-        val normalized = source.replace("\r\n", "\n").replace('\r', '\n')
-        val replacement = normalized.split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
-        if (replacement.size < 2) return
-        document.replaceLine(index, replacement)
-
-        val safeCursor = cursor.coerceIn(0, normalized.length)
-        val beforeCursor = normalized.substring(0, safeCursor)
-        val relativeLine = beforeCursor.count { it == '\n' }
-        val cursorInLine = beforeCursor.substringAfterLast('\n').length
-        activeLine = index + relativeLine
-        lastActiveLine = activeLine ?: index
-        refreshRows(requestFocus = true, cursorPosition = cursorInLine)
-        scheduleSave()
-    }
-
-    private fun refreshRows(requestFocus: Boolean = false, cursorPosition: Int? = null) {
-        val revision = renderRevision.incrementAndGet()
-        val lines = document.snapshot()
-        val active = activeLine
-        val editing = mode == EditorMode.Edit
-        io.execute {
-            val rows = rowFactory.create(lines, active)
-            main.post {
-                if (!isDestroyed && revision == renderRevision.get()) {
-                    noteAdapter.submit(
-                        rows,
-                        editing,
-                        active.takeIf { requestFocus },
-                        cursorPosition
-                    )
-                }
+    private fun openEntry(entry: NoteLibrary.Entry) {
+        when (entry.type) {
+            NoteLibrary.EntryType.Folder -> {
+                currentFolder = entry.relativePath
+                refresh()
             }
+            NoteLibrary.EntryType.Note -> startActivity(EditorActivity.intent(this, entry.relativePath))
         }
     }
 
-    private fun scheduleSave() {
-        saveTask?.let(main::removeCallbacks)
-        val markdown = document.markdown()
-        saveTask = Runnable { io.execute { workspace.save(markdown) } }.also {
-            main.postDelayed(it, SAVE_DELAY_MS)
-        }
+    private fun navigateUp() {
+        currentFolder = library.parentOf(currentFolder) ?: ""
+        refresh()
     }
 
-    private fun importAsset(uri: Uri) {
-        io.execute {
-            val result = runCatching { workspace.import(contentResolver, uri) }
-            main.post {
-                result.onSuccess { asset ->
-                    document.insertAfter(activeLine, asset.markdown())
-                    refreshRows()
-                    scheduleSave()
+    private fun showCreateDialog(type: CreateType) {
+        val input = EditText(this).apply {
+            hint = getString(if (type == CreateType.Folder) R.string.folder_name else R.string.note_name)
+            setSingleLine()
+            val padding = (24 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding / 2, padding, 0)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (type == CreateType.Folder) R.string.create_folder else R.string.create_note)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.create) { _, _ ->
+                runCatching {
+                    when (type) {
+                        CreateType.Folder -> library.createFolder(currentFolder, input.text.toString())
+                        CreateType.Note -> library.createNote(currentFolder, input.text.toString())
+                    }
+                }.onSuccess { entry ->
+                    refresh()
+                    if (entry.type == NoteLibrary.EntryType.Note) openEntry(entry)
                 }.onFailure {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.import_failed, it.message ?: "unknown error"),
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this, it.message ?: getString(R.string.create_failed), Toast.LENGTH_LONG).show()
                 }
             }
-        }
+            .show()
+        input.requestFocus()
     }
 
-    override fun onStop() {
-        super.onStop()
-        val markdown = document.markdown()
-        io.execute { workspace.save(markdown) }
-    }
-
-    override fun onDestroy() {
-        saveTask?.let(main::removeCallbacks)
-        noteAdapter.close()
-        io.shutdown()
-        super.onDestroy()
-    }
-
-    private enum class EditorMode { Read, Edit }
+    private enum class CreateType { Folder, Note }
 
     private companion object {
-        const val SAVE_DELAY_MS = 350L
-        val DEFAULT_NOTE = """
-            # InkNote
-
-            阅读模式没有光标，所有内容都是渲染结果。
-
-            点击右上角编辑图标进入编辑模式；只有光标所在行显示 Markdown 源码。
-
-            使用链接形状的插入按钮选择图片、PDF 或其他文件，文件会复制到笔记内部。
-        """.trimIndent()
+        const val STATE_FOLDER = "current_folder"
     }
 }

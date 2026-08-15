@@ -4,11 +4,15 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.mlevngr.inknote.library.NotePathPolicy
 import java.io.File
 import java.util.UUID
 
-class NoteWorkspace(context: Context, noteId: String = "welcome") {
-    val root = File(context.filesDir, "notes/$noteId").also(File::mkdirs)
+class NoteWorkspace(context: Context, notePath: String) {
+    private val notesRoot = File(context.filesDir, "notes").also(File::mkdirs)
+    val root = requireNotNull(NotePathPolicy.resolve(notesRoot, notePath)) {
+        "Invalid note path"
+    }.also(File::mkdirs)
     private val assets = File(root, "assets").also(File::mkdirs)
     private val markdownFile = File(root, "note.md")
 

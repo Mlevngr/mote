@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/app_root"
+    android:id="@+id/library_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/app_background"
     android:orientation="vertical">
 
     <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
+        android:id="@+id/library_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/toolbar_background"
+        app:navigationIconTint="@color/text_primary"
         app:titleTextColor="@color/text_primary">
 
         <LinearLayout
@@ -22,35 +23,51 @@
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/insert_asset"
+                android:id="@+id/create_folder"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/insert_asset"
+                android:contentDescription="@string/create_folder"
                 android:padding="12dp"
-                android:src="@drawable/ic_link_24"
-                app:tint="?attr/colorOnSurface" />
+                android:src="@drawable/ic_create_folder_24"
+                app:tint="@color/text_primary" />
 
             <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/toggle_mode"
+                android:id="@+id/create_note"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/switch_to_edit_mode"
+                android:contentDescription="@string/create_note"
                 android:padding="12dp"
-                android:src="@drawable/ic_edit_24"
-                app:tint="?attr/colorOnSurface" />
+                android:src="@drawable/ic_note_add_24"
+                app:tint="@color/text_primary" />
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/note_content"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingTop="6dp"
-        android:paddingBottom="32dp"
-        android:scrollbars="vertical" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/library_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="8dp"
+            android:paddingBottom="24dp"
+            android:scrollbars="vertical" />
+
+        <TextView
+            android:id="@+id/empty_library"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:drawablePadding="12dp"
+            android:gravity="center"
+            android:text="@string/empty_library"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp" />
+    </FrameLayout>
 
 </LinearLayout>

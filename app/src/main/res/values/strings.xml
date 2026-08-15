@@ -5,4 +5,14 @@
     <string name="switch_to_read_mode">切换到阅读模式</string>
     <string name="insert_asset">插入文件</string>
     <string name="import_failed">导入失败：%1$s</string>
+    <string name="back_to_library">返回笔记库</string>
+    <string name="go_up">返回上级文件夹</string>
+    <string name="create_folder">新建文件夹</string>
+    <string name="create_note">新建笔记</string>
+    <string name="folder_name">文件夹名称</string>
+    <string name="note_name">笔记名称</string>
+    <string name="create">创建</string>
+    <string name="create_failed">创建失败</string>
+    <string name="folder">文件夹</string>
+    <string name="empty_library">这里还没有笔记\n使用右上角按钮创建文件夹或笔记</string>
 </resources>
