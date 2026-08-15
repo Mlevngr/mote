@@ -9,4 +9,5 @@
     <color name="text_primary">#232328</color>
     <color name="text_secondary">#666672</color>
     <color name="error_text">#B3261E</color>
+    <color name="launcher_background">#4F5FAF</color>
 </resources>

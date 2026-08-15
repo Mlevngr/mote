@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.4.0 APK](https://github.com/Mlevngr/note/releases/download/v0.4.0/InkNote-0.4.0.apk)**
+**[直接下载 InkNote 0.4.1 APK](https://github.com/Mlevngr/note/releases/download/v0.4.1/InkNote-0.4.1.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -26,6 +26,8 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 在行首按退格会合并到上一行，刚换行后可立即退回上一行。
 - 右上角的书写/阅读图标切换模式，链接形状的图标统一负责插入文件。
 - 图标、状态栏和编辑界面跟随系统明亮/深色主题。
+- 编辑源码会按屏幕宽度自动折行；回车仍会创建下一条 Markdown 源码行。
+- 提供 Adaptive Launcher 图标和 Android 13+ 单色主题图标。
 
 当前测试签名证书 SHA-256：
 

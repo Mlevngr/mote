@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
             onLongActivate = ::enterEditModeAt,
             onLineChanged = ::updateLine,
             onSplitLine = ::splitLine,
+            onMultilineInput = ::replaceLineFromEditor,
             onMergeWithPrevious = ::mergeWithPrevious
         )
 
@@ -167,6 +168,23 @@ class MainActivity : AppCompatActivity() {
         refreshRows(requestFocus = true, cursorPosition = cursor)
         scheduleSave()
         return true
+    }
+
+    private fun replaceLineFromEditor(index: Int, source: String, cursor: Int) {
+        if (mode != EditorMode.Edit || index !in 0 until document.size) return
+        val normalized = source.replace("\r\n", "\n").replace('\r', '\n')
+        val replacement = normalized.split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
+        if (replacement.size < 2) return
+        document.replaceLine(index, replacement)
+
+        val safeCursor = cursor.coerceIn(0, normalized.length)
+        val beforeCursor = normalized.substring(0, safeCursor)
+        val relativeLine = beforeCursor.count { it == '\n' }
+        val cursorInLine = beforeCursor.substringAfterLast('\n').length
+        activeLine = index + relativeLine
+        lastActiveLine = activeLine ?: index
+        refreshRows(requestFocus = true, cursorPosition = cursorInLine)
+        scheduleSave()
     }
 
     private fun refreshRows(requestFocus: Boolean = false, cursorPosition: Int? = null) {

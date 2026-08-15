@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
+import android.text.InputType
 import android.text.TextWatcher
 import android.util.LruCache
 import android.view.Gravity
@@ -39,6 +40,7 @@ class HybridNoteAdapter(
     private val onLongActivate: (Int) -> Unit,
     private val onLineChanged: (Int, String) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
+    private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
@@ -98,8 +100,13 @@ class HybridNoteAdapter(
                 typeface = Typeface.MONOSPACE
                 textSize = 16f
                 minHeight = dp(48)
-                gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                isSingleLine = true
+                gravity = Gravity.TOP or Gravity.START
+                isSingleLine = false
+                maxLines = Int.MAX_VALUE
+                setHorizontallyScrolling(false)
+                inputType = InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                    InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
                 imeOptions = EditorInfo.IME_ACTION_NEXT
             })
             TYPE_MARKDOWN, TYPE_ATTACHMENT, TYPE_ERROR -> TextHolder(TextView(context).apply {
@@ -175,6 +182,7 @@ class HybridNoteAdapter(
             row.source,
             onLineChanged,
             onSplitLine,
+            onMultilineInput,
             onMergeWithPrevious
         )
         if (focusLine == row.lineIndex) {
@@ -260,15 +268,26 @@ class HybridNoteAdapter(
             source: String,
             onChanged: (Int, String) -> Unit,
             onSplit: (Int, Int) -> Unit,
+            onMultiline: (Int, String, Int) -> Unit,
             onMerge: (Int) -> Boolean
         ) {
             detach()
+            var handlingLineBreak = false
             if (editor.text?.toString() != source) editor.setText(source)
             watcher = object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) =
-                    onChanged(lineIndex, s?.toString().orEmpty())
-                override fun afterTextChanged(s: Editable?) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    val value = s?.toString().orEmpty()
+                    if ('\n' !in value && '\r' !in value) onChanged(lineIndex, value)
+                }
+
+                override fun afterTextChanged(s: Editable?) {
+                    val value = s?.toString().orEmpty()
+                    if (!handlingLineBreak && ('\n' in value || '\r' in value)) {
+                        handlingLineBreak = true
+                        onMultiline(lineIndex, value, editor.selectionStart.coerceAtLeast(0))
+                    }
+                }
             }.also(editor::addTextChangedListener)
             editor.onDeleteAtStart = { onMerge(lineIndex) }
             editor.setOnEditorActionListener { _, actionId, event ->

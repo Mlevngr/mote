@@ -37,6 +37,12 @@ class MarkdownDocumentTest {
         assertEquals(null, document.mergeWithPrevious(0))
     }
 
+    @Test fun replacesOneEditorLineWithPastedLines() {
+        val document = MarkdownDocument.parse("Before\nOld\nAfter")
+        assertEquals(1..3, document.replaceLine(1, listOf("One", "Two", "Three")))
+        assertEquals("Before\nOne\nTwo\nThree\nAfter", document.markdown())
+    }
+
     @Test fun emptyDocumentStillHasAnEditableLine() {
         assertEquals(listOf(""), MarkdownDocument.parse("").snapshot())
     }

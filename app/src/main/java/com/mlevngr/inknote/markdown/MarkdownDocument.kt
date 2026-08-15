@@ -37,6 +37,16 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return cursor
     }
 
+    fun replaceLine(index: Int, replacement: List<String>): IntRange {
+        require(replacement.isNotEmpty()) { "Replacement must contain at least one line" }
+        require(replacement.none { '\n' in it || '\r' in it }) {
+            "Replacement entries cannot contain line breaks"
+        }
+        lines.removeAt(index)
+        lines.addAll(index, replacement)
+        return index until index + replacement.size
+    }
+
     fun markdown(): String = lines.joinToString("\n")
 
     companion object {
