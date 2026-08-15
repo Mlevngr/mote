@@ -1,14 +1,11 @@
 package com.mlevngr.inknote.markdown
 
-/**
- * Splits a Markdown document into native Markdown and embedded local asset blocks.
- *
- * Imported files use standard Markdown syntax so the note remains portable:
- * `![name](assets/id.png)` for images and `[name](assets/id.pdf)` for PDFs.
- */
+/** Parses InkNote embeds while retaining legacy standard-Markdown imports. */
 object MarkdownAssetParser {
+    private val embed = Regex("""^\s*!\[\[asset:(assets/[^|\]]+)(?:\|([^\]]*))?]]\s*$""")
     private val image = Regex("""^\s*!\[([^]]*)]\((assets/[^)]+)\)\s*$""")
     private val link = Regex("""^\s*\[([^]]*)]\((assets/[^)]+)\)\s*$""")
+    private val imageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "heic", "heif")
 
     fun parse(source: String): List<PreviewBlock> {
         if (source.isEmpty()) return emptyList()
@@ -23,27 +20,25 @@ object MarkdownAssetParser {
         }
 
         source.lineSequence().forEach { line ->
+            val embedMatch = embed.matchEntire(line)
             val imageMatch = image.matchEntire(line)
             val linkMatch = link.matchEntire(line)
             when {
+                embedMatch != null -> {
+                    flushMarkdown()
+                    val path = embedMatch.groupValues[1]
+                    val label = embedMatch.groupValues[2]
+                    result += embeddedBlock(path, label)
+                }
                 imageMatch != null -> {
                     flushMarkdown()
                     val (alt, path) = imageMatch.destructured
-                    result += if (path.endsWith(".pdf", ignoreCase = true)) {
-                        PreviewBlock.Pdf(path, alt)
-                    } else {
-                        PreviewBlock.Image(path, alt)
-                    }
+                    result += if (extension(path) == "pdf") PreviewBlock.Pdf(path, alt)
+                    else PreviewBlock.Image(path, alt)
                 }
-                linkMatch != null && linkMatch.groupValues[2].endsWith(
-                    ".pdf",
-                    ignoreCase = true
-                ) -> {
+                linkMatch != null && extension(linkMatch.groupValues[2]) == "pdf" -> {
                     flushMarkdown()
-                    result += PreviewBlock.Pdf(
-                        linkMatch.groupValues[2],
-                        linkMatch.groupValues[1]
-                    )
+                    result += PreviewBlock.Pdf(linkMatch.groupValues[2], linkMatch.groupValues[1])
                 }
                 else -> markdown.appendLine(line)
             }
@@ -51,4 +46,12 @@ object MarkdownAssetParser {
         flushMarkdown()
         return result
     }
+
+    private fun embeddedBlock(path: String, label: String): PreviewBlock = when (extension(path)) {
+        "pdf" -> PreviewBlock.Pdf(path, label)
+        in imageExtensions -> PreviewBlock.Image(path, label)
+        else -> PreviewBlock.Attachment(path, label)
+    }
+
+    private fun extension(path: String): String = path.substringAfterLast('.', "").lowercase()
 }

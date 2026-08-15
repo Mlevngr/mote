@@ -5,17 +5,16 @@ data class ImportedAsset(
     val displayName: String,
     val kind: Kind
 ) {
-    enum class Kind { Image, Pdf }
+    enum class Kind { Image, Pdf, Attachment }
 
+    /** InkNote embed syntax is deliberately not a clickable Markdown hyperlink. */
     fun markdown(): String {
         val label = displayName
             .replace('\n', ' ')
             .replace('\r', ' ')
+            .replace('|', ' ')
             .replace('[', '(')
             .replace(']', ')')
-        return when (kind) {
-            Kind.Image -> "![$label]($relativePath)"
-            Kind.Pdf -> "[$label]($relativePath)"
-        }
+        return "![[asset:$relativePath|$label]]"
     }
 }

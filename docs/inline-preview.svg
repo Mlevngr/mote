@@ -1,30 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="780" viewBox="0 0 760 780">
-  <rect width="760" height="780" fill="#fffdf8"/>
-  <rect width="760" height="66" fill="#f4f1ff"/>
-  <text x="28" y="42" font-family="sans-serif" font-size="28" font-weight="700" fill="#232328">InkNote</text>
-  <text x="478" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">完成</text>
-  <text x="570" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">图片</text>
-  <text x="662" y="40" font-family="sans-serif" font-size="17" fill="#4054b2">PDF</text>
-  <text x="28" y="95" font-family="sans-serif" font-size="14" fill="#777782">点击段落编辑，其余内容保持预览</text>
-
-  <text x="28" y="151" font-family="sans-serif" font-size="31" font-weight="700" fill="#232328">课程笔记</text>
-
-  <rect x="20" y="178" width="720" height="105" rx="14" fill="#ffffff" stroke="#4054b2" stroke-width="2"/>
-  <text x="38" y="211" font-family="monospace" font-size="16" fill="#4054b2">这一段正在编辑：</text>
-  <text x="38" y="245" font-family="monospace" font-size="18" fill="#232328">这里是 **Markdown** 源码。</text>
-  <line x1="38" y1="263" x2="290" y2="263" stroke="#4054b2" stroke-width="2"/>
-
-  <text x="28" y="326" font-family="sans-serif" font-size="18" fill="#232328">其他段落仍然是 <tspan font-weight="700">实时预览</tspan>，不会全部变成源码。</text>
-
-  <rect x="28" y="355" width="704" height="175" rx="14" fill="#cfe8dc"/>
-  <circle cx="170" cy="430" r="52" fill="#fff3b0"/>
-  <path d="M28 510 L190 397 L310 485 L430 390 L732 530 L28 530Z" fill="#709f88"/>
-  <text x="42" y="378" font-family="sans-serif" font-size="14" fill="#44564c">图片直接显示</text>
-
-  <rect x="28" y="558" width="704" height="190" rx="10" fill="#ffffff" stroke="#c9c9d2"/>
-  <text x="45" y="588" font-family="sans-serif" font-size="14" fill="#666672">课程讲义.pdf  •  1/6</text>
-  <rect x="70" y="615" width="620" height="18" rx="3" fill="#dfe2f3"/>
-  <rect x="70" y="651" width="545" height="10" rx="3" fill="#dadade"/>
-  <rect x="70" y="677" width="585" height="10" rx="3" fill="#dadade"/>
-  <rect x="70" y="703" width="455" height="10" rx="3" fill="#dadade"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+  <rect width="900" height="560" rx="28" fill="#f5f4f8"/>
+  <rect x="40" y="30" width="820" height="68" rx="18" fill="#ffffff"/>
+  <text x="72" y="74" font-family="sans-serif" font-size="26" font-weight="700" fill="#24232a">InkNote</text>
+  <path d="M721 63h38M730 51a13 13 0 0 0 0 24M750 51a13 13 0 0 1 0 24" stroke="#34313d" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M803 73l-13 3 3-13 18-18 10 10z" fill="#34313d"/>
+  <text x="63" y="151" font-family="sans-serif" font-size="34" font-weight="700" fill="#222129">行级 Markdown 笔记</text>
+  <text x="63" y="201" font-family="sans-serif" font-size="22" fill="#4f4d56">这一行是已经渲染的正文，仍然保持实时预览。</text>
+  <rect x="56" y="224" width="788" height="62" rx="12" fill="#ebe8f4" stroke="#77708d"/>
+  <text x="75" y="264" font-family="monospace" font-size="21" fill="#393344">- **只有光标这一行** 显示源码|</text>
+  <text x="64" y="330" font-family="sans-serif" font-size="22" fill="#4f4d56">• 点击其他行，源码编辑框自动移动，不需要“完成”。</text>
+  <rect x="58" y="363" width="375" height="158" rx="16" fill="#d8e0ea"/>
+  <path d="M78 488l87-91 65 60 58-50 123 114H78z" fill="#8298ae"/>
+  <text x="474" y="398" font-family="sans-serif" font-size="22" font-weight="700" fill="#292730">PDF · 1/6</text>
+  <rect x="474" y="416" width="328" height="105" rx="9" fill="#fff" stroke="#d1ced8"/>
+  <line x1="496" y1="443" x2="772" y2="443" stroke="#aaa6b1" stroke-width="5"/>
+  <line x1="496" y1="466" x2="735" y2="466" stroke="#cbc8d0" stroke-width="5"/>
+  <line x1="496" y1="489" x2="756" y2="489" stroke="#cbc8d0" stroke-width="5"/>
 </svg>

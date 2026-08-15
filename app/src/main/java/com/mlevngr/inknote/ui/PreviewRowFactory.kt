@@ -38,6 +38,14 @@ class PreviewRowFactory(private val workspace: NoteWorkspace) {
                     }
                 }
             }
+            is PreviewBlock.Attachment -> {
+                val file = workspace.resolveAsset(block.relativePath)
+                if (file == null) {
+                    listOf(PreviewRow.Error("Missing attachment: ${block.relativePath}"))
+                } else {
+                    listOf(PreviewRow.Attachment(file, block.label.ifBlank { file.name }))
+                }
+            }
         }
     }
 }

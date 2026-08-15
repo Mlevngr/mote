@@ -4,28 +4,33 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MarkdownDocumentTest {
-    @Test fun splitsParagraphsAndRoundTripsNormalizedMarkdown() {
-        val document = MarkdownDocument.parse("# Title\n\nFirst paragraph.\n\n- one\n- two")
-        assertEquals(listOf("# Title", "First paragraph.", "- one\n- two"), document.snapshot())
-        assertEquals("# Title\n\nFirst paragraph.\n\n- one\n- two", document.markdown())
+    @Test fun preservesEveryMarkdownLineIncludingBlankLines() {
+        val source = "# Title\n\nFirst paragraph.\n- one\n- two"
+        val document = MarkdownDocument.parse(source)
+        assertEquals(listOf("# Title", "", "First paragraph.", "- one", "- two"), document.snapshot())
+        assertEquals(source, document.markdown())
     }
 
-    @Test fun keepsBlankLinesInsideFencedCode() {
-        val source = "```kotlin\nval a = 1\n\nval b = 2\n```\n\nAfter"
-        assertEquals(
-            listOf("```kotlin\nval a = 1\n\nval b = 2\n```", "After"),
-            MarkdownDocument.parse(source).snapshot()
-        )
+    @Test fun preservesTrailingBlankLine() {
+        val document = MarkdownDocument.parse("First\n")
+        assertEquals(listOf("First", ""), document.snapshot())
+        assertEquals("First\n", document.markdown())
     }
 
-    @Test fun updatesAndInsertsBlocks() {
-        val document = MarkdownDocument.parse("First\n\nThird")
+    @Test fun updatesAndInsertsIndividualLines() {
+        val document = MarkdownDocument.parse("First\nThird")
         document.update(0, "Changed")
         assertEquals(1, document.insertAfter(0, "Second"))
-        assertEquals("Changed\n\nSecond\n\nThird", document.markdown())
+        assertEquals("Changed\nSecond\nThird", document.markdown())
     }
 
-    @Test fun emptyDocumentStillHasAnEditableBlock() {
+    @Test fun splitsAtCursorAndReturnsNewActiveLine() {
+        val document = MarkdownDocument.parse("Hello world")
+        assertEquals(1, document.splitLine(0, 5))
+        assertEquals(listOf("Hello", " world"), document.snapshot())
+    }
+
+    @Test fun emptyDocumentStillHasAnEditableLine() {
         assertEquals(listOf(""), MarkdownDocument.parse("").snapshot())
     }
 }

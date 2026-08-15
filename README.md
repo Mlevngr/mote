@@ -4,44 +4,48 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.2.0 APK](https://github.com/Mlevngr/note/releases/download/v0.2.0/InkNote-0.2.0-debug.apk)**
+**[直接下载 InkNote 0.3.0 APK](https://github.com/Mlevngr/note/releases/download/v0.3.0/InkNote-0.3.0-debug.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用 Android Debug 签名，适合当前测试阶段直接安装。
 
-## 块级编辑与实时预览
+## 行级编辑与实时预览
 
-![InkNote 块级编辑和图片/PDF内嵌预览示意](docs/inline-preview.svg)
+![InkNote 行级编辑和文件内嵌预览示意](docs/inline-preview.svg)
 
-InkNote 使用混合编辑模式，而不是上下分栏：
+InkNote 有清晰的阅读、编辑两种模式：
 
-- 默认所有段落都是渲染后的实时预览。
-- 点击一个段落时，仅该段落显示 Markdown 源码编辑框。
-- 点击另一个段落或“完成”，刚才的段落立即恢复渲染。
-- 图片直接显示；PDF 展开为真实页面，并只渲染屏幕附近页面。
-- GitHub README 不会把 PDF 链接展开成页面，但 InkNote 应用内会。
+- 阅读模式没有光标，所有行都是渲染结果。
+- 编辑模式只有光标所在行显示 Markdown 源码，其他行继续显示渲染结果。
+- 点击另一行会直接移动编辑位置，不需要点击“完成”。
+- 在当前行按回车会拆分并进入下一行。
+- 右上角的书写/阅读图标切换模式，链接形状的图标统一负责插入文件。
+
+## 文件插入
+
+插入按钮使用 Android 系统文件选择器，并根据所选文件自动处理：
+
+- 图片直接显示。
+- PDF 展开为真实页面，页面在接近屏幕时才渲染。
+- 其他文件显示为附件卡片。
+- 所有文件都会复制到当前笔记的私有 `assets/` 目录；笔记不会依赖原文件 URI，也不会创建可点击的外部链接。
+
+InkNote 使用非链接的本地嵌入指令：
+
+```markdown
+![[asset:assets/uuid.png|照片]]
+![[asset:assets/uuid.pdf|课程讲义]]
+![[asset:assets/uuid.zip|资料包]]
+```
+
+旧版本写入的标准 Markdown 图片与本地 PDF 链接仍可正常预览。
 
 ## 当前 MVP
 
-- Plain Markdown source stored as `note.md`
-- Hybrid block editor: only the active block shows Markdown source
-- Every inactive block remains rendered as live preview
-- CommonMark rendering with headings, emphasis, lists, quotes, tables, task lists and strike-through
-- Image and PDF import through Android's system document picker
-- Imported images are rendered inline, not as links
-- Every PDF page is expanded into the preview and rendered lazily by `RecyclerView`
-- Imported assets are copied into the note's private `assets/` directory
-- Atomic local autosave; no storage permission and no network access
-
-## 可移植资产语法
-
-InkNote 保持标准 Markdown 文件格式：
-
-```markdown
-![照片](assets/uuid.png)
-[课程讲义](assets/uuid.pdf)
-```
-
-源文件中的 PDF 使用标准链接语法保证可移植性，但 InkNote 预览不会显示文字链接，而是显示 PDF 页面。
+- 行级混合 Markdown 编辑
+- CommonMark、标题、强调、列表、引用、表格、任务列表和删除线渲染
+- 图片、PDF 与普通附件的统一导入
+- 文件复制到笔记私有目录，无存储权限、无网络依赖
+- 原子自动保存
 
 ## 本地数据结构
 
@@ -50,7 +54,8 @@ files/notes/welcome/
 ├── note.md
 └── assets/
     ├── uuid.png
-    └── uuid.pdf
+    ├── uuid.pdf
+    └── uuid.zip
 ```
 
 ## 构建

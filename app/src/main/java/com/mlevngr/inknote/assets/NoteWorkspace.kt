@@ -29,12 +29,21 @@ class NoteWorkspace(context: Context, noteId: String = "welcome") {
     fun resolveAsset(relativePath: String): File? =
         AssetPathPolicy.resolve(root, relativePath)?.takeIf(File::isFile)
 
-    fun import(resolver: ContentResolver, uri: Uri, kind: ImportedAsset.Kind): ImportedAsset {
-        val displayName = queryDisplayName(resolver, uri) ?: when (kind) {
-            ImportedAsset.Kind.Image -> "image"
-            ImportedAsset.Kind.Pdf -> "document.pdf"
-        }
-        val extension = extensionFor(resolver.getType(uri), displayName, kind)
+    fun import(resolver: ContentResolver, uri: Uri): ImportedAsset {
+        val displayName = queryDisplayName(resolver, uri) ?: "attachment"
+        val mimeType = resolver.getType(uri)
+        val kind = detectKind(mimeType, displayName)
+        return import(resolver, uri, kind, displayName, mimeType)
+    }
+
+    private fun import(
+        resolver: ContentResolver,
+        uri: Uri,
+        kind: ImportedAsset.Kind,
+        displayName: String,
+        mimeType: String?
+    ): ImportedAsset {
+        val extension = extensionFor(mimeType, displayName, kind)
         val fileName = "${UUID.randomUUID()}.$extension"
         val destination = File(assets, fileName)
         val temporary = File(assets, "$fileName.tmp")
@@ -44,6 +53,13 @@ class NoteWorkspace(context: Context, noteId: String = "welcome") {
         }
         check(temporary.renameTo(destination)) { "Cannot store selected file" }
         return ImportedAsset("assets/$fileName", displayName, kind)
+    }
+
+    private fun detectKind(mimeType: String?, displayName: String): ImportedAsset.Kind = when {
+        mimeType?.startsWith("image/") == true -> ImportedAsset.Kind.Image
+        mimeType == "application/pdf" || displayName.endsWith(".pdf", ignoreCase = true) ->
+            ImportedAsset.Kind.Pdf
+        else -> ImportedAsset.Kind.Attachment
     }
 
     private fun queryDisplayName(resolver: ContentResolver, uri: Uri): String? =
@@ -57,15 +73,16 @@ class NoteWorkspace(context: Context, noteId: String = "welcome") {
         kind: ImportedAsset.Kind
     ): String {
         if (kind == ImportedAsset.Kind.Pdf) return "pdf"
+        val fallback = if (kind == ImportedAsset.Kind.Image) "jpg" else "bin"
         return when (mimeType) {
             "image/png" -> "png"
             "image/webp" -> "webp"
             "image/gif" -> "gif"
             "image/heif", "image/heic" -> "heic"
-            else -> displayName.substringAfterLast('.', "jpg")
+            else -> displayName.substringAfterLast('.', fallback)
                 .lowercase()
-                .takeIf { it.matches(Regex("[a-z0-9]{1,5}")) }
-                ?: "jpg"
+                .takeIf { it.matches(Regex("[a-z0-9]{1,10}")) }
+                ?: fallback
         }
     }
 }

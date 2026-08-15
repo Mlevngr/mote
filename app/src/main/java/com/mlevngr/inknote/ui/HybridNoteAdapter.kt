@@ -11,7 +11,9 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.LruCache
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -33,7 +35,8 @@ import java.util.concurrent.Executors
 class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
-    private val onBlockChanged: (Int, String) -> Unit
+    private val onLineChanged: (Int, String) -> Unit,
+    private val onSplitLine: (Int, Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
@@ -48,13 +51,15 @@ class HybridNoteAdapter(
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
     private var rows: List<HybridRow> = emptyList()
-    private var focusBlock: Int? = null
+    private var focusLine: Int? = null
+    private var editing = false
     private val horizontalPadding = dp(18)
     private val targetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
 
-    fun submit(newRows: List<HybridRow>, activeBlock: Int?) {
+    fun submit(newRows: List<HybridRow>, editing: Boolean, focusLine: Int? = null) {
         rows = newRows
-        focusBlock = activeBlock
+        this.editing = editing
+        this.focusLine = focusLine
         notifyDataSetChanged()
     }
 
@@ -66,6 +71,7 @@ class HybridNoteAdapter(
             is PreviewRow.Markdown -> TYPE_MARKDOWN
             is PreviewRow.Image -> TYPE_IMAGE
             is PreviewRow.PdfPage -> TYPE_PDF
+            is PreviewRow.Attachment -> TYPE_ATTACHMENT
             is PreviewRow.Error -> TYPE_ERROR
         }
     }
@@ -77,21 +83,24 @@ class HybridNoteAdapter(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                setPadding(horizontalPadding, dp(12), horizontalPadding, dp(12))
+                setPadding(horizontalPadding, dp(9), horizontalPadding, dp(9))
                 setBackgroundResource(R.drawable.editor_background)
                 typeface = Typeface.MONOSPACE
                 textSize = 16f
-                minHeight = dp(64)
-                gravity = Gravity.TOP or Gravity.START
+                minHeight = dp(48)
+                gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                isSingleLine = true
+                imeOptions = EditorInfo.IME_ACTION_NEXT
             })
-            TYPE_MARKDOWN, TYPE_ERROR -> TextHolder(TextView(context).apply {
+            TYPE_MARKDOWN, TYPE_ATTACHMENT, TYPE_ERROR -> TextHolder(TextView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                setPadding(horizontalPadding, dp(10), horizontalPadding, dp(10))
+                setPadding(horizontalPadding, dp(8), horizontalPadding, dp(8))
+                minHeight = dp(40)
+                gravity = Gravity.CENTER_VERTICAL
                 textSize = 17f
-                setTextIsSelectable(true)
             })
             else -> AssetHolder(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -108,12 +117,19 @@ class HybridNoteAdapter(
         when (val row = rows[position]) {
             is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
             is HybridRow.Rendered -> {
-                holder.itemView.setOnClickListener { onActivate(row.blockIndex) }
+                holder.itemView.setOnClickListener(if (editing) {
+                    { onActivate(row.lineIndex) }
+                } else null)
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
                         holder.text.setTextColor(Color.rgb(35, 35, 40))
                         markwon.setMarkdown(holder.text, preview.source)
+                    }
+                    is PreviewRow.Attachment -> {
+                        holder as TextHolder
+                        holder.text.setTextColor(Color.rgb(65, 82, 110))
+                        holder.text.text = "📎  ${preview.label}  •  ${formatSize(preview.file.length())}"
                     }
                     is PreviewRow.Error -> {
                         holder as TextHolder
@@ -128,7 +144,8 @@ class HybridNoteAdapter(
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
-        if (holder is EditorHolder) holder.detachWatcher()
+        holder.itemView.setOnClickListener(null)
+        if (holder is EditorHolder) holder.detach()
         if (holder is AssetHolder) {
             holder.image.tag = null
             holder.image.setImageDrawable(null)
@@ -136,9 +153,9 @@ class HybridNoteAdapter(
     }
 
     private fun bindEditor(holder: EditorHolder, row: HybridRow.Editor) {
-        holder.bind(row.blockIndex, row.source, onBlockChanged)
-        if (focusBlock == row.blockIndex) {
-            focusBlock = null
+        holder.bind(row.lineIndex, row.source, onLineChanged, onSplitLine)
+        if (focusLine == row.lineIndex) {
+            focusLine = null
             holder.editor.post {
                 holder.editor.requestFocus()
                 holder.editor.setSelection(holder.editor.text?.length ?: 0)
@@ -175,9 +192,7 @@ class HybridNoteAdapter(
         worker.execute {
             val bitmap = runCatching(loader).getOrNull() ?: return@execute
             bitmapCache.put(key, bitmap)
-            main.post {
-                if (holder.image.tag == key) holder.image.setImageBitmap(bitmap)
-            }
+            main.post { if (holder.image.tag == key) holder.image.setImageBitmap(bitmap) }
         }
     }
 
@@ -189,6 +204,12 @@ class HybridNoteAdapter(
         return requireNotNull(BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply {
             inSampleSize = sample
         })) { "Unsupported image" }
+    }
+
+    private fun formatSize(bytes: Long): String = when {
+        bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024f * 1024f))
+        bytes >= 1024 -> "%.1f KB".format(bytes / 1024f)
+        else -> "$bytes B"
     }
 
     override fun close() {
@@ -206,31 +227,34 @@ class HybridNoteAdapter(
     private class EditorHolder(val editor: TextInputEditText) : RecyclerView.ViewHolder(editor) {
         private var watcher: TextWatcher? = null
 
-        fun bind(blockIndex: Int, source: String, onChanged: (Int, String) -> Unit) {
-            detachWatcher()
+        fun bind(
+            lineIndex: Int,
+            source: String,
+            onChanged: (Int, String) -> Unit,
+            onSplit: (Int, Int) -> Unit
+        ) {
+            detach()
             if (editor.text?.toString() != source) editor.setText(source)
             watcher = object : TextWatcher {
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int
-                ) = Unit
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int
-                ) = onChanged(blockIndex, s?.toString().orEmpty())
-
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) =
+                    onChanged(lineIndex, s?.toString().orEmpty())
                 override fun afterTextChanged(s: Editable?) = Unit
             }.also(editor::addTextChangedListener)
+            editor.setOnEditorActionListener { _, actionId, event ->
+                val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER &&
+                    event.action == KeyEvent.ACTION_DOWN
+                if (actionId == EditorInfo.IME_ACTION_NEXT || enter) {
+                    onSplit(lineIndex, editor.selectionStart.coerceAtLeast(0))
+                    true
+                } else false
+            }
         }
 
-        fun detachWatcher() {
+        fun detach() {
             watcher?.let(editor::removeTextChangedListener)
             watcher = null
+            editor.setOnEditorActionListener(null)
         }
     }
 
@@ -267,5 +291,6 @@ class HybridNoteAdapter(
         const val TYPE_IMAGE = 2
         const val TYPE_PDF = 3
         const val TYPE_ERROR = 4
+        const val TYPE_ATTACHMENT = 5
     }
 }

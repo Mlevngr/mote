@@ -11,49 +11,36 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/toolbar_background"
-        app:titleTextColor="@color/text_primary" />
+        app:titleTextColor="@color/text_primary">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="end|center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="2dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:paddingStart="8dp"
-            android:text="@string/hybrid_edit_hint"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/finish_editing"
-            style="@style/Widget.Material3.Button.TextButton"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:text="@string/finish_editing" />
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/add_image"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:text="@string/import_image" />
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/insert_asset"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/insert_asset"
+                android:padding="12dp"
+                android:src="@drawable/ic_link_24"
+                app:tint="@color/text_primary" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/add_pdf"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:text="@string/import_pdf" />
-    </LinearLayout>
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/toggle_mode"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/switch_to_edit_mode"
+                android:padding="12dp"
+                android:src="@drawable/ic_edit_24"
+                app:tint="@color/text_primary" />
+        </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/note_content"

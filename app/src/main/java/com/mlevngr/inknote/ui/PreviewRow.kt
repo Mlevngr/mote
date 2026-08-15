@@ -11,5 +11,6 @@ sealed interface PreviewRow {
         val pageIndex: Int,
         val pageCount: Int
     ) : PreviewRow
+    data class Attachment(val file: File, val label: String) : PreviewRow
     data class Error(val message: String) : PreviewRow
 }

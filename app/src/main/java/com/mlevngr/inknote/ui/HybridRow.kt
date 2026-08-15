@@ -1,15 +1,15 @@
 package com.mlevngr.inknote.ui
 
 sealed interface HybridRow {
-    val blockIndex: Int
+    val lineIndex: Int
 
     data class Editor(
-        override val blockIndex: Int,
+        override val lineIndex: Int,
         val source: String
     ) : HybridRow
 
     data class Rendered(
-        override val blockIndex: Int,
+        override val lineIndex: Int,
         val preview: PreviewRow
     ) : HybridRow
 }

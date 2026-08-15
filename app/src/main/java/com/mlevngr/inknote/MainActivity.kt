@@ -9,12 +9,11 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.getSystemService
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.button.MaterialButton
-import com.mlevngr.inknote.assets.ImportedAsset
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.ui.HybridNoteAdapter
@@ -29,18 +28,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var noteAdapter: HybridNoteAdapter
     private lateinit var rowFactory: HybridRowFactory
     private lateinit var recyclerView: RecyclerView
+    private lateinit var modeButton: AppCompatImageButton
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val renderRevision = AtomicInteger()
-    private var activeBlock: Int? = null
+    private var mode = EditorMode.Read
+    private var activeLine: Int? = null
+    private var lastActiveLine = 0
     private var saveTask: Runnable? = null
 
-    private val openImage = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { importAsset(it, ImportedAsset.Kind.Image) }
-    }
-
-    private val openPdf = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { importAsset(it, ImportedAsset.Kind.Pdf) }
+    private val openAsset = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(::importAsset)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,8 +50,9 @@ class MainActivity : AppCompatActivity() {
         rowFactory = HybridRowFactory(PreviewRowFactory(workspace))
         noteAdapter = HybridNoteAdapter(
             context = this,
-            onActivate = ::activateBlock,
-            onBlockChanged = ::updateBlock
+            onActivate = ::activateLine,
+            onLineChanged = ::updateLine,
+            onSplitLine = ::splitLine
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).title = getString(R.string.app_name)
@@ -62,19 +61,17 @@ class MainActivity : AppCompatActivity() {
             adapter = noteAdapter
             itemAnimator = null
         }
-        findViewById<MaterialButton>(R.id.finish_editing).setOnClickListener {
-            finishEditing()
+        modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
+            it.setOnClickListener { toggleMode() }
         }
-        findViewById<MaterialButton>(R.id.add_image).setOnClickListener {
-            openImage.launch(arrayOf("image/*"))
+        findViewById<AppCompatImageButton>(R.id.insert_asset).setOnClickListener {
+            openAsset.launch(arrayOf("*/*"))
         }
-        findViewById<MaterialButton>(R.id.add_pdf).setOnClickListener {
-            openPdf.launch(arrayOf("application/pdf"))
-        }
+        updateModeButton()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (activeBlock != null) {
-                    finishEditing()
+                if (mode == EditorMode.Edit) {
+                    enterReadMode()
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -84,38 +81,67 @@ class MainActivity : AppCompatActivity() {
         refreshRows()
     }
 
-    private fun activateBlock(index: Int) {
-        if (activeBlock == index) return
-        activeBlock = index
+    private fun toggleMode() {
+        if (mode == EditorMode.Read) enterEditMode() else enterReadMode()
+    }
+
+    private fun enterEditMode() {
+        mode = EditorMode.Edit
+        activeLine = lastActiveLine.coerceIn(0, document.size - 1)
+        updateModeButton()
         refreshRows(requestFocus = true)
     }
 
-    private fun updateBlock(index: Int, source: String) {
+    private fun enterReadMode() {
+        mode = EditorMode.Read
+        activeLine?.let { lastActiveLine = it }
+        activeLine = null
+        getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(recyclerView.windowToken, 0)
+        recyclerView.clearFocus()
+        updateModeButton()
+        refreshRows()
+        scheduleSave()
+    }
+
+    private fun updateModeButton() {
+        val reading = mode == EditorMode.Read
+        modeButton.setImageResource(if (reading) R.drawable.ic_edit_24 else R.drawable.ic_read_mode_24)
+        modeButton.contentDescription = getString(
+            if (reading) R.string.switch_to_edit_mode else R.string.switch_to_read_mode
+        )
+    }
+
+    private fun activateLine(index: Int) {
+        if (mode != EditorMode.Edit || activeLine == index) return
+        activeLine = index
+        lastActiveLine = index
+        refreshRows(requestFocus = true)
+    }
+
+    private fun updateLine(index: Int, source: String) {
         if (index !in 0 until document.size) return
         document.update(index, source)
         scheduleSave()
     }
 
-    private fun finishEditing() {
-        if (activeBlock == null) return
-        activeBlock = null
-        getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(
-            recyclerView.windowToken,
-            0
-        )
-        refreshRows()
+    private fun splitLine(index: Int, cursor: Int) {
+        if (mode != EditorMode.Edit || index !in 0 until document.size) return
+        activeLine = document.splitLine(index, cursor)
+        lastActiveLine = activeLine ?: index
+        refreshRows(requestFocus = true)
         scheduleSave()
     }
 
     private fun refreshRows(requestFocus: Boolean = false) {
         val revision = renderRevision.incrementAndGet()
-        val blocks = document.snapshot()
-        val active = activeBlock
+        val lines = document.snapshot()
+        val active = activeLine
+        val editing = mode == EditorMode.Edit
         io.execute {
-            val rows = rowFactory.create(blocks, active)
+            val rows = rowFactory.create(lines, active)
             main.post {
                 if (!isDestroyed && revision == renderRevision.get()) {
-                    noteAdapter.submit(rows, active.takeIf { requestFocus })
+                    noteAdapter.submit(rows, editing, active.takeIf { requestFocus })
                 }
             }
         }
@@ -129,12 +155,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun importAsset(uri: Uri, kind: ImportedAsset.Kind) {
+    private fun importAsset(uri: Uri) {
         io.execute {
-            val result = runCatching { workspace.import(contentResolver, uri, kind) }
+            val result = runCatching { workspace.import(contentResolver, uri) }
             main.post {
                 result.onSuccess { asset ->
-                    document.insertAfter(activeBlock, asset.markdown())
+                    document.insertAfter(activeLine, asset.markdown())
                     refreshRows()
                     scheduleSave()
                 }.onFailure {
@@ -161,16 +187,18 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    private enum class EditorMode { Read, Edit }
+
     private companion object {
         const val SAVE_DELAY_MS = 350L
         val DEFAULT_NOTE = """
             # InkNote
 
-            点击任意段落进行 Markdown 编辑；点击“完成”后，该段落恢复实时预览。
+            阅读模式没有光标，所有内容都是渲染结果。
 
-            - 只有正在编辑的段落显示 Markdown 源码
-            - 其他文字、图片和 PDF 始终保持渲染状态
-            - 点击“图片”或“PDF”即可把文件插入当前段落之后
+            点击右上角编辑图标进入编辑模式；只有光标所在行显示 Markdown 源码。
+
+            使用链接形状的插入按钮选择图片、PDF 或其他文件，文件会复制到笔记内部。
         """.trimIndent()
     }
 }

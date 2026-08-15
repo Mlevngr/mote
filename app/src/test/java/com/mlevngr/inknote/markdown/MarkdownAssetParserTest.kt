@@ -11,17 +11,28 @@ class MarkdownAssetParserTest {
         )
     }
 
-    @Test fun extractsAnImportedImage() {
+    @Test fun classifiesInkNoteEmbedsByCopiedFileType() {
         assertEquals(
             listOf(PreviewBlock.Image("assets/photo.png", "photo")),
-            MarkdownAssetParser.parse("![photo](assets/photo.png)")
+            MarkdownAssetParser.parse("![[asset:assets/photo.png|photo]]")
+        )
+        assertEquals(
+            listOf(PreviewBlock.Pdf("assets/paper.pdf", "paper")),
+            MarkdownAssetParser.parse("![[asset:assets/paper.pdf|paper]]")
+        )
+        assertEquals(
+            listOf(PreviewBlock.Attachment("assets/data.zip", "data")),
+            MarkdownAssetParser.parse("![[asset:assets/data.zip|data]]")
         )
     }
 
-    @Test fun extractsPdfAsInlinePreviewBlock() {
+    @Test fun keepsLegacyStandardMarkdownImportsWorking() {
         assertEquals(
-            listOf(PreviewBlock.Pdf("assets/paper.pdf", "paper")),
-            MarkdownAssetParser.parse("[paper](assets/paper.pdf)")
+            listOf(
+                PreviewBlock.Image("assets/photo.png", "photo"),
+                PreviewBlock.Pdf("assets/paper.pdf", "paper")
+            ),
+            MarkdownAssetParser.parse("![photo](assets/photo.png)\n[paper](assets/paper.pdf)")
         )
     }
 
@@ -36,11 +47,11 @@ class MarkdownAssetParserTest {
                 PreviewBlock.Markdown("Before"),
                 PreviewBlock.Image("assets/a.jpg", "A"),
                 PreviewBlock.Markdown("Between"),
-                PreviewBlock.Pdf("assets/b.pdf", "B"),
+                PreviewBlock.Attachment("assets/b.txt", "B"),
                 PreviewBlock.Markdown("After")
             ),
             MarkdownAssetParser.parse(
-                "Before\n![A](assets/a.jpg)\nBetween\n[B](assets/b.pdf)\nAfter"
+                "Before\n![[asset:assets/a.jpg|A]]\nBetween\n![[asset:assets/b.txt|B]]\nAfter"
             )
         )
     }

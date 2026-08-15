@@ -1,52 +1,39 @@
 package com.mlevngr.inknote.markdown
 
-/** A small block model for hybrid Markdown editing. Blocks are separated by blank lines. */
-class MarkdownDocument private constructor(private val blocks: MutableList<String>) {
-    val size: Int get() = blocks.size
+/** A lossless, line-oriented Markdown model used by the hybrid editor. */
+class MarkdownDocument private constructor(private val lines: MutableList<String>) {
+    val size: Int get() = lines.size
 
-    operator fun get(index: Int): String = blocks[index]
+    operator fun get(index: Int): String = lines[index]
 
-    fun snapshot(): List<String> = blocks.toList()
+    fun snapshot(): List<String> = lines.toList()
 
     fun update(index: Int, source: String) {
-        blocks[index] = source
+        require('\n' !in source && '\r' !in source) { "A line cannot contain a line break" }
+        lines[index] = source
     }
 
     fun insertAfter(index: Int?, source: String): Int {
-        val position = if (index == null) blocks.size else (index + 1).coerceAtMost(blocks.size)
-        blocks.add(position, source)
+        require('\n' !in source && '\r' !in source) { "A line cannot contain a line break" }
+        val position = if (index == null) lines.size else (index + 1).coerceAtMost(lines.size)
+        lines.add(position, source)
         return position
     }
 
-    fun markdown(): String = blocks.joinToString("\n\n")
+    fun splitLine(index: Int, cursor: Int): Int {
+        val source = lines[index]
+        val splitAt = cursor.coerceIn(0, source.length)
+        lines[index] = source.substring(0, splitAt)
+        lines.add(index + 1, source.substring(splitAt))
+        return index + 1
+    }
+
+    fun markdown(): String = lines.joinToString("\n")
 
     companion object {
-        fun parse(source: String): MarkdownDocument {
-            if (source.isBlank()) return MarkdownDocument(mutableListOf(""))
-            val result = mutableListOf<String>()
-            val current = StringBuilder()
-            var insideFence = false
-
-            fun flush() {
-                val block = current.toString().trimEnd('\n')
-                if (block.isNotBlank()) result += block
-                current.clear()
-            }
-
-            source.lineSequence().forEach { line ->
-                val isFence = line.trimStart().startsWith("```") ||
-                        line.trimStart().startsWith("~~~")
-                if (line.isBlank() && !insideFence) {
-                    flush()
-                } else {
-                    if (current.isNotEmpty()) current.append('\n')
-                    current.append(line)
-                    if (isFence) insideFence = !insideFence
-                }
-            }
-            flush()
-            if (result.isEmpty()) result += ""
-            return MarkdownDocument(result)
-        }
+        fun parse(source: String): MarkdownDocument = MarkdownDocument(
+            source.split('\n', ignoreCase = false, limit = Int.MAX_VALUE).toMutableList()
+                .ifEmpty { mutableListOf("") }
+        )
     }
 }
