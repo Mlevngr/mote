@@ -40,6 +40,20 @@ class MarkdownEditingTest {
         assertEdit(quote, "> item", 6, 6)
     }
 
+    @Test fun movesCursorBehindAInsertedPrefixOnAnEmptyLine() {
+        MarkdownBlockStyle.entries.forEach { style ->
+            val result = MarkdownEditing.toggleBlock("", 0, 0, style)
+            assertEdit(result, style.prefix, style.prefix.length, style.prefix.length)
+        }
+
+        assertEdit(MarkdownEditing.setHeading("", 0, 0, 3), "### ", 4, 4)
+    }
+
+    @Test fun leavesCursorBeforeIndentationWhenItReallyPrecedesTheInsertionPoint() {
+        val result = MarkdownEditing.toggleBlock("  item", 0, 0, MarkdownBlockStyle.Bullet)
+        assertEdit(result, "  - item", 0, 0)
+    }
+
     @Test fun headingMenuReplacesHeadingAndListPrefixes() {
         val heading = MarkdownEditing.setHeading("- Project", 9, 9, 2)
         assertEdit(heading, "## Project", 10, 10)

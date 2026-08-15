@@ -160,7 +160,7 @@ object MarkdownEditing {
         fun adjusted(position: Int): Int {
             val safe = position.coerceIn(0, source.length)
             return when {
-                safe <= location -> safe
+                safe < location -> safe
                 safe <= location + existing.length -> location + replacement.length
                 else -> safe - existing.length + replacement.length
             }.coerceIn(0, updated.length)
