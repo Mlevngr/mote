@@ -2,6 +2,8 @@ package com.mlevngr.inknote.library
 
 import android.content.Context
 import java.io.File
+import java.util.Properties
+import java.util.UUID
 
 class NoteLibrary internal constructor(private val root: File) {
     constructor(context: Context) : this(File(context.filesDir, "notes"))
@@ -34,6 +36,15 @@ class NoteLibrary internal constructor(private val root: File) {
         val folderColor: FolderColor = FolderColor.Blue,
         val preview: NotePreview = NotePreview(""),
         val noteDirectory: File? = null
+    )
+
+    data class TrashEntry(
+        val id: String,
+        val name: String,
+        val type: EntryType,
+        val originalLocation: FolderLocation,
+        val deletedAt: Long,
+        val folderColor: FolderColor = FolderColor.Blue
     )
 
     fun list(location: FolderLocation): List<Entry> = requireFolder(location)
@@ -139,10 +150,135 @@ class NoteLibrary internal constructor(private val root: File) {
     fun renameFolder(location: FolderLocation, folderName: String, requestedName: String): Entry =
         folderEntry(renameChild(location, folderName, requestedName, EntryType.Folder))
 
+    fun moveNoteToTrash(
+        location: FolderLocation,
+        noteName: String,
+        deletedAt: Long = System.currentTimeMillis()
+    ): TrashEntry = moveToTrash(location, noteName, EntryType.Note, deletedAt)
+
+    fun moveFolderToTrash(
+        location: FolderLocation,
+        folderName: String,
+        deletedAt: Long = System.currentTimeMillis()
+    ): TrashEntry = moveToTrash(location, folderName, EntryType.Folder, deletedAt)
+
+    fun listTrash(): List<TrashEntry> = trashRoot().listFiles().orEmpty()
+        .filter(File::isDirectory)
+        .mapNotNull(::readTrashEntry)
+        .sortedByDescending(TrashEntry::deletedAt)
+
+    fun restoreTrashEntry(id: String): Entry {
+        val trash = findTrashContainer(id)
+        val metadata = requireNotNull(readTrashEntry(trash)) { "回收站项目已损坏" }
+        val payload = File(trash, TRASH_PAYLOAD)
+        val target = runCatching { requireFolder(metadata.originalLocation) }.getOrElse { root }
+        val destination = uniqueTypedChild(target, metadata.name, metadata.type)
+        check(payload.renameTo(destination)) { "无法恢复项目" }
+        trash.deleteRecursively()
+        return entry(destination, metadata.type)
+    }
+
+    fun permanentlyDeleteTrashEntry(id: String) {
+        val container = findTrashContainer(id)
+        check(container.deleteRecursively() && !container.exists()) { "无法永久删除项目" }
+    }
+
+    fun cleanupExpiredTrash(
+        retentionMillis: Long,
+        now: Long = System.currentTimeMillis()
+    ): Int {
+        require(retentionMillis >= 0) { "保留时间无效" }
+        var deleted = 0
+        listTrash().filter { now - it.deletedAt >= retentionMillis }.forEach { entry ->
+            runCatching { permanentlyDeleteTrashEntry(entry.id) }
+                .onSuccess { deleted++ }
+        }
+        return deleted
+    }
+
     fun setFolderColor(location: FolderLocation, folderName: String, color: FolderColor): Entry {
         val folder = findChild(location, folderName, EntryType.Folder)
         File(folder, FOLDER_COLOR_FILE).writeText(color.id)
         return folderEntry(folder)
+    }
+
+    private fun moveToTrash(
+        location: FolderLocation,
+        name: String,
+        type: EntryType,
+        deletedAt: Long
+    ): TrashEntry {
+        val source = findChild(location, name, type)
+        val container = File(trashRoot(), "${deletedAt}_${UUID.randomUUID()}.trash")
+        check(container.mkdir()) { "无法创建回收站项目" }
+        val metadata = TrashEntry(
+            id = container.name,
+            name = displayName(source, type),
+            type = type,
+            originalLocation = location,
+            deletedAt = deletedAt,
+            folderColor = if (type == EntryType.Folder) {
+                FolderColor.fromId(runCatching { File(source, FOLDER_COLOR_FILE).readText().trim() }.getOrNull())
+            } else FolderColor.Blue
+        )
+        return runCatching {
+            writeTrashEntry(container, metadata)
+            check(source.renameTo(File(container, TRASH_PAYLOAD))) { "无法移入回收站" }
+            metadata
+        }.getOrElse { error ->
+            container.deleteRecursively()
+            throw error
+        }
+    }
+
+    private fun trashRoot(): File = File(root, TRASH_DIRECTORY).apply {
+        check(isDirectory || mkdirs()) { "无法访问回收站" }
+    }
+
+    private fun writeTrashEntry(container: File, entry: TrashEntry) {
+        val properties = Properties().apply {
+            setProperty("name", entry.name)
+            setProperty("type", entry.type.name)
+            setProperty("deletedAt", entry.deletedAt.toString())
+            setProperty("path.count", entry.originalLocation.names.size.toString())
+            entry.originalLocation.names.forEachIndexed { index, name ->
+                setProperty("path.$index", name)
+            }
+        }
+        File(container, TRASH_METADATA).outputStream().use { properties.store(it, null) }
+    }
+
+    private fun readTrashEntry(container: File): TrashEntry? = runCatching {
+        val payload = File(container, TRASH_PAYLOAD)
+        require(payload.isDirectory)
+        val properties = Properties().apply {
+            File(container, TRASH_METADATA).inputStream().use(::load)
+        }
+        val type = EntryType.valueOf(requireNotNull(properties.getProperty("type")))
+        require(typeOf(payload) == type)
+        val pathCount = requireNotNull(properties.getProperty("path.count")).toInt()
+        TrashEntry(
+            id = container.name,
+            name = requireNotNull(properties.getProperty("name")),
+            type = type,
+            originalLocation = FolderLocation(List(pathCount) { index ->
+                requireNotNull(properties.getProperty("path.$index"))
+            }),
+            deletedAt = requireNotNull(properties.getProperty("deletedAt")).toLong(),
+            folderColor = if (type == EntryType.Folder) {
+                FolderColor.fromId(runCatching { File(payload, FOLDER_COLOR_FILE).readText().trim() }.getOrNull())
+            } else FolderColor.Blue
+        )
+    }.getOrNull()
+
+    private fun findTrashContainer(id: String): File {
+        require(id.isNotBlank() && '/' !in id && '\u0000' !in id) { "回收站项目无效" }
+        val trashRoot = trashRoot().canonicalFile
+        val container = File(trashRoot, id).canonicalFile
+        require(container.isDirectory && container.parentFile == trashRoot) {
+            "回收站项目不存在"
+        }
+        return container
     }
 
     private fun requireFolder(location: FolderLocation): File {
@@ -280,6 +416,9 @@ class NoteLibrary internal constructor(private val root: File) {
         const val ASSETS_DIRECTORY = "assets"
         const val BODY_SEPARATION_MARKER = ".body-title-separated-v1"
         private const val FOLDER_COLOR_FILE = ".inknote-folder-color"
+        private const val TRASH_DIRECTORY = ".trash"
+        private const val TRASH_PAYLOAD = "payload"
+        private const val TRASH_METADATA = "metadata.properties"
         private const val NOTE_DIRECTORY_SUFFIX = ".note"
         private const val FOLDER_DIRECTORY_SUFFIX = ".folder"
         private const val MAX_NAME_LENGTH = 80

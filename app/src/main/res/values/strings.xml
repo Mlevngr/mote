@@ -45,13 +45,13 @@
     <string name="no_move_destination">没有可用的目标文件夹</string>
     <string name="move_failed">移动失败</string>
     <string name="delete_note">删除笔记</string>
-    <string name="delete_note_confirmation">确定永久删除“%1$s”及其中的所有附件吗？此操作无法撤销。</string>
+    <string name="delete_note_confirmation">将“%1$s”及其中的所有附件移入回收站吗？保留期内可以恢复。</string>
     <string name="delete">删除</string>
-    <string name="note_deleted">笔记已删除</string>
+    <string name="note_deleted">笔记已移入回收站</string>
     <string name="delete_failed">删除失败</string>
     <string name="delete_folder">删除文件夹</string>
-    <string name="delete_folder_confirmation">确定永久删除“%1$s”以及其中的所有笔记和附件吗？此操作无法撤销。</string>
-    <string name="folder_deleted">文件夹已删除</string>
+    <string name="delete_folder_confirmation">将“%1$s”以及其中的所有笔记和附件移入回收站吗？保留期内可以恢复。</string>
+    <string name="folder_deleted">文件夹已移入回收站</string>
     <string name="open_failed">无法打开：%1$s</string>
     <string name="unknown_error">未知错误</string>
     <string name="appearance">外观与布局</string>
@@ -81,4 +81,17 @@
         <item quantity="one">%1$d 个项目</item>
         <item quantity="other">%1$d 个项目</item>
     </plurals>
+    <string name="trash">回收站</string>
+    <string name="move_to_trash">移入回收站</string>
+    <string name="empty_trash">回收站为空</string>
+    <string name="trash_retention">自动清理时间</string>
+    <string name="retention_7_days">保留 7 天</string>
+    <string name="retention_30_days">保留 30 天</string>
+    <string name="retention_90_days">保留 90 天</string>
+    <string name="trash_entry_summary">%1$s删除 · 原位置：%2$s · %3$d 天后清理</string>
+    <string name="restore">恢复</string>
+    <string name="restored">已恢复</string>
+    <string name="delete_permanently">永久删除</string>
+    <string name="permanent_delete_confirmation">确定永久删除“%1$s”吗？此操作无法撤销。</string>
+    <string name="permanently_deleted">已永久删除</string>
 </resources>

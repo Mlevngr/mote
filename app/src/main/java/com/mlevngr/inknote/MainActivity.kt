@@ -1,15 +1,23 @@
 package com.mlevngr.inknote
 
+import android.content.Intent
+import android.content.res.ColorStateList
+import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
@@ -23,6 +31,8 @@ import com.mlevngr.inknote.appearance.NotePreviewMode
 import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
+import com.mlevngr.inknote.library.TrashPreferences
+import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
@@ -32,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var adapter: NoteLibraryAdapter
     private lateinit var appearance: AppearancePreferences
+    private lateinit var trashPreferences: TrashPreferences
     private lateinit var toolbar: MaterialToolbar
     private lateinit var emptyView: TextView
     private lateinit var recyclerView: RecyclerView
@@ -48,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         SystemBarInsets.install(findViewById(R.id.library_root))
 
         library = NoteLibrary(this)
+        trashPreferences = TrashPreferences(this)
         currentFolder = runCatching {
             savedInstanceState
                 ?.getStringArrayList(STATE_FOLDER)
@@ -61,6 +73,9 @@ class MainActivity : AppCompatActivity() {
             itemAnimator = null
         }
         configureLibraryLayout()
+        findViewById<AppCompatImageButton>(R.id.open_trash).setOnClickListener {
+            startActivity(Intent(this, TrashActivity::class.java))
+        }
         findViewById<AppCompatImageButton>(R.id.appearance).setOnClickListener {
             showAppearanceDialog()
         }
@@ -103,6 +118,7 @@ class MainActivity : AppCompatActivity() {
         val requestedFolder = currentFolder
         val revision = refreshRevision.incrementAndGet()
         io.execute {
+            library.cleanupExpiredTrash(trashPreferences.retention.durationMillis)
             val requested = runCatching { library.list(requestedFolder) }
             val entries = requested.getOrElse { runCatching { library.list(FolderLocation.Root) }.getOrDefault(emptyList()) }
             main.post {
@@ -325,7 +341,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFolderColorDialog(folder: NoteLibrary.Entry) {
         val colors = FolderColor.entries
-        val labels = arrayOf(
+        val descriptions = arrayOf(
             getString(R.string.folder_color_blue),
             getString(R.string.folder_color_purple),
             getString(R.string.folder_color_pink),
@@ -333,15 +349,74 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.folder_color_green),
             getString(R.string.folder_color_gray)
         )
-        MaterialAlertDialogBuilder(this)
+        val grid = GridLayout(this).apply {
+            columnCount = 3
+            val horizontal = 20.dp
+            val vertical = 12.dp
+            setPadding(horizontal, vertical, horizontal, vertical)
+        }
+        colors.forEachIndexed { index, color ->
+            val selected = color == folder.folderColor
+            val fill = folderColorValue(color)
+            val circle = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(fill)
+                setStroke(if (selected) 4.dp else 1.dp, if (selected) {
+                    ThemeColors.resolve(this@MainActivity, R.attr.inkNoteTextPrimary)
+                } else Color.TRANSPARENT)
+            }
+            val mask = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.WHITE)
+            }
+            val button = AppCompatImageButton(this).apply {
+                background = RippleDrawable(
+                    ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(
+                            ThemeColors.resolve(this@MainActivity, R.attr.inkNoteTextPrimary),
+                            36
+                        )
+                    ),
+                    circle,
+                    mask
+                )
+                contentDescription = descriptions[index]
+                setPadding(16.dp, 16.dp, 16.dp, 16.dp)
+                if (selected) setImageResource(R.drawable.ic_check_24) else setImageDrawable(null)
+                imageTintList = ColorStateList.valueOf(
+                    if (ColorUtils.calculateLuminance(fill) > 0.45) Color.BLACK else Color.WHITE
+                )
+            }
+            grid.addView(button, GridLayout.LayoutParams().apply {
+                width = 72.dp
+                height = 64.dp
+                setMargins(4.dp, 4.dp, 4.dp, 4.dp)
+            })
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.folder_color)
-            .setSingleChoiceItems(labels, colors.indexOf(folder.folderColor)) { dialog, which ->
-                runCatching { library.setFolderColor(currentFolder, folder.name, colors[which]) }
+            .setView(grid)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        grid.children().forEach { child ->
+            child.setOnClickListener {
+                val index = grid.indexOfChild(child)
+                runCatching { library.setFolderColor(currentFolder, folder.name, colors[index]) }
                     .onSuccess { refresh() }
                     .onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
                 dialog.dismiss()
             }
-            .show()
+        }
+        dialog.show()
+    }
+
+    private fun GridLayout.children(): List<android.view.View> =
+        List(childCount) { getChildAt(it) }
+
+    private fun folderColorValue(folderColor: FolderColor): Int {
+        val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+        return if (night) folderColor.dark else folderColor.light
     }
 
     private fun showRenameDialog(entry: NoteLibrary.Entry) {
@@ -408,8 +483,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.delete_note)
             .setMessage(getString(R.string.delete_note_confirmation, note.name))
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                runCatching { library.deleteNote(currentFolder, note.name) }
+            .setPositiveButton(R.string.move_to_trash) { _, _ ->
+                runCatching { library.moveNoteToTrash(currentFolder, note.name) }
                     .onSuccess {
                         refresh()
                         Toast.makeText(this, R.string.note_deleted, Toast.LENGTH_SHORT).show()
@@ -430,8 +505,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.delete_folder)
             .setMessage(getString(R.string.delete_folder_confirmation, folder.name))
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                runCatching { library.deleteFolder(currentFolder, folder.name) }
+            .setPositiveButton(R.string.move_to_trash) { _, _ ->
+                runCatching { library.moveFolderToTrash(currentFolder, folder.name) }
                     .onSuccess {
                         refresh()
                         Toast.makeText(this, R.string.folder_deleted, Toast.LENGTH_SHORT).show()

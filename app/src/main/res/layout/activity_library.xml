@@ -22,6 +22,16 @@
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/open_trash"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/trash"
+                android:padding="12dp"
+                android:src="@drawable/ic_trash_24"
+                app:tint="?attr/inkNoteTextPrimary" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/appearance"
                 android:layout_width="48dp"
                 android:layout_height="48dp"

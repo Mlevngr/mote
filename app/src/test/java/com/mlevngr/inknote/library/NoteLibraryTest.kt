@@ -333,4 +333,87 @@ class NoteLibraryTest {
         assertTrue(listed.preview.renderSource.contains("assets/cover.jpg"))
         assertEquals(File(root, note.relativePath).canonicalFile, listed.noteDirectory?.canonicalFile)
     }
+
+    @Test fun movesNoteToTrashWithAssetsAndRestoresItsOriginalLocation() {
+        val (root, library) = library()
+        val folder = library.createFolder(rootLocation, "Work")
+        val location = rootLocation.child(folder.name)
+        val note = library.createNote(location, "Plan")
+        File(root, "${note.relativePath}/assets/photo.jpg").writeText("image")
+
+        val trashed = library.moveNoteToTrash(location, note.name, deletedAt = 1_000L)
+
+        assertTrue(library.list(location).isEmpty())
+        assertEquals(listOf("Plan"), library.listTrash().map { it.name })
+        assertEquals(location, trashed.originalLocation)
+
+        val restored = library.restoreTrashEntry(trashed.id)
+
+        assertEquals("Work.folder/Plan.note", restored.relativePath)
+        assertEquals("image", File(root, "${restored.relativePath}/assets/photo.jpg").readText())
+        assertTrue(library.listTrash().isEmpty())
+    }
+
+    @Test fun restoresWithAUniqueNameWhenOriginalNameWasReused() {
+        val (_, library) = library()
+        val note = library.createNote(rootLocation, "Plan")
+        val trashed = library.moveNoteToTrash(rootLocation, note.name, deletedAt = 2_000L)
+        library.createNote(rootLocation, "Plan")
+
+        val restored = library.restoreTrashEntry(trashed.id)
+
+        assertEquals("Plan (1)", restored.name)
+        assertEquals(listOf("Plan", "Plan (1)"), library.list(rootLocation).map { it.name })
+    }
+
+    @Test fun movesFolderToTrashAndKeepsNestedNotesAndColor() {
+        val (_, library) = library()
+        val folder = library.createFolder(rootLocation, "Archive")
+        library.setFolderColor(rootLocation, folder.name, FolderColor.Green)
+        library.createNote(rootLocation.child(folder.name), "Nested")
+
+        val trashed = library.moveFolderToTrash(rootLocation, folder.name, deletedAt = 3_000L)
+        val restored = library.restoreTrashEntry(trashed.id)
+
+        assertEquals(FolderColor.Green, restored.folderColor)
+        assertEquals(
+            listOf("Nested"),
+            library.list(rootLocation.child(restored.name)).map { it.name }
+        )
+    }
+
+    @Test fun cleanupDeletesOnlyExpiredTrashEntries() {
+        val (_, library) = library()
+        val old = library.createNote(rootLocation, "Old")
+        library.moveNoteToTrash(rootLocation, old.name, deletedAt = 1_000L)
+        val recent = library.createNote(rootLocation, "Recent")
+        library.moveNoteToTrash(rootLocation, recent.name, deletedAt = 9_000L)
+
+        val deleted = library.cleanupExpiredTrash(retentionMillis = 5_000L, now = 10_000L)
+
+        assertEquals(1, deleted)
+        assertEquals(listOf("Recent"), library.listTrash().map { it.name })
+    }
+
+    @Test fun permanentDeleteRemovesTrashPayload() {
+        val (root, library) = library()
+        val note = library.createNote(rootLocation, "Secret")
+        val trashed = library.moveNoteToTrash(rootLocation, note.name)
+
+        library.permanentlyDeleteTrashEntry(trashed.id)
+
+        assertTrue(library.listTrash().isEmpty())
+        assertTrue(File(root, ".trash/${trashed.id}").let { !it.exists() })
+    }
+
+    @Test fun rejectsTrashIdsThatEscapeTheTrashDirectory() {
+        val (root, library) = library()
+        val note = library.createNote(rootLocation, "Safe")
+
+        val failure = runCatching { library.permanentlyDeleteTrashEntry("..") }.exceptionOrNull()
+
+        assertEquals("回收站项目不存在", failure?.message)
+        assertTrue(root.isDirectory)
+        assertEquals(listOf(note.name), library.list(rootLocation).map { it.name })
+    }
 }
