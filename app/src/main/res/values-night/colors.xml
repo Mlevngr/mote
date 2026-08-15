@@ -10,4 +10,11 @@
     <color name="text_secondary">#C9C5D0</color>
     <color name="error_text">#FFB4AB</color>
     <color name="launcher_background">#303A78</color>
+    <color name="launcher_shadow">#66000000</color>
+    <color name="launcher_page">#1C2034</color>
+    <color name="launcher_spine">#343B64</color>
+    <color name="launcher_lines">#AAB3DF</color>
+    <color name="launcher_pen">#FFC260</color>
+    <color name="launcher_eraser">#FF8A7A</color>
+    <color name="launcher_tip">#E2E6FF</color>
 </resources>
