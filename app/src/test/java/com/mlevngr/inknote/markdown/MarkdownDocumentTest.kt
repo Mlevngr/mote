@@ -101,6 +101,34 @@ class MarkdownDocumentTest {
         assertEquals(listOf("Before", "After", "Asset"), document.snapshot())
     }
 
+    @Test fun movesALineToAnyBoundaryBeforeTheFirstLine() {
+        val document = MarkdownDocument.parse("Before\nMiddle\nAsset\nAfter")
+
+        assertEquals(0, document.moveLineToInsertion(2, 0))
+        assertEquals(listOf("Asset", "Before", "Middle", "After"), document.snapshot())
+    }
+
+    @Test fun movesALineToAnyBoundaryBetweenTwoLines() {
+        val document = MarkdownDocument.parse("Before\nAsset\nMiddle\nAfter")
+
+        assertEquals(2, document.moveLineToInsertion(1, 3))
+        assertEquals(listOf("Before", "Middle", "Asset", "After"), document.snapshot())
+    }
+
+    @Test fun movingToTheBoundaryBesideTheSourceKeepsOneCopy() {
+        val document = MarkdownDocument.parse("Before\nAsset\nAfter")
+
+        assertEquals(1, document.moveLineToInsertion(1, 2))
+        assertEquals(listOf("Before", "Asset", "After"), document.snapshot())
+    }
+
+    @Test fun copiesAtAnExactBoundaryWithoutReplacingNearbyText() {
+        val document = MarkdownDocument.parse("Before\nAfter")
+
+        assertEquals(1..1, document.pasteAtInsertion(1, "Asset"))
+        assertEquals(listOf("Before", "Asset", "After"), document.snapshot())
+    }
+
     @Test fun removingTheOnlyLineLeavesAnEditableEmptyBody() {
         val document = MarkdownDocument.parse("Only line")
         document.removeLine(0)

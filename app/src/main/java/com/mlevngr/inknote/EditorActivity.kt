@@ -23,6 +23,7 @@ import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
+import com.mlevngr.inknote.ui.AssetTransferTarget
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
@@ -106,6 +107,7 @@ class EditorActivity : AppCompatActivity() {
             onMergeWithPrevious = ::mergeWithPrevious,
             onAssetActions = ::showAssetActions,
             onPasteAt = ::showPasteAt,
+            onPasteAtBoundary = ::pasteAtBoundary,
             onAppendAtEnd = ::appendLineAtEnd,
             onBackFromIme = ::handleBackNavigation
         )
@@ -162,7 +164,14 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun handleBackNavigation() {
-        if (mode == EditorMode.Edit) enterReadMode() else finish()
+        when {
+            pendingAssetTransfer != null -> {
+                clearAssetTransfer()
+                Toast.makeText(this, R.string.asset_transfer_cancelled, Toast.LENGTH_SHORT).show()
+            }
+            mode == EditorMode.Edit -> enterReadMode()
+            else -> finish()
+        }
     }
 
     private fun enterEditMode() {
@@ -412,7 +421,11 @@ class EditorActivity : AppCompatActivity() {
         val assetPath = runCatching {
             file.canonicalFile.relativeTo(workspace.root.canonicalFile).invariantSeparatorsPath
         }.getOrElse { file.name }
+        if (mode == EditorMode.Edit) enterReadMode()
         pendingAssetTransfer = AssetTransfer(source, lineIndex, assetPath, move)
+        noteAdapter.setTransferTarget(
+            if (move) AssetTransferTarget.Move else AssetTransferTarget.Copy
+        )
         val clipboard = getSystemService<ClipboardManager>()
         if (move) {
             if (clipboardText() == source) clipboard?.clearPrimaryClip()
@@ -446,12 +459,12 @@ class EditorActivity : AppCompatActivity() {
         val transfer = stagedTransfer?.takeIf { pending ->
             pending.move || clipboardText == null || clipboardText == pending.source
         }
-        if (stagedTransfer != null && transfer == null) pendingAssetTransfer = null
+        if (stagedTransfer != null && transfer == null) clearAssetTransfer()
         val target = targetLine?.coerceIn(0, document.size - 1)
         if (transfer?.move == true) {
             val currentSource = locateTransferSource(transfer)
             if (currentSource < 0) {
-                pendingAssetTransfer = null
+                clearAssetTransfer()
                 Toast.makeText(this, R.string.asset_move_source_unavailable, Toast.LENGTH_LONG)
                     .show()
                 return
@@ -472,7 +485,7 @@ class EditorActivity : AppCompatActivity() {
                 destination,
                 replacesBlank
             ) ?: 0
-            pendingAssetTransfer = null
+            clearAssetTransfer()
             refreshRows()
             scheduleSave()
             Toast.makeText(this, R.string.asset_moved, Toast.LENGTH_SHORT).show()
@@ -498,9 +511,66 @@ class EditorActivity : AppCompatActivity() {
             } else active
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+        if (transfer != null) clearAssetTransfer()
         refreshRows()
         scheduleSave()
         Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun pasteAtBoundary(boundaryIndex: Int) {
+        val transfer = pendingAssetTransfer ?: run {
+            noteAdapter.setTransferTarget(null)
+            return
+        }
+        val boundary = boundaryIndex.coerceIn(0, document.size)
+        if (transfer.move) {
+            val currentSource = locateTransferSource(transfer)
+            if (currentSource < 0) {
+                clearAssetTransfer()
+                Toast.makeText(this, R.string.asset_move_source_unavailable, Toast.LENGTH_LONG)
+                    .show()
+                return
+            }
+            val destination = document.moveLineToInsertion(currentSource, boundary)
+            activeLine = remapLineAfterMove(
+                activeLine,
+                currentSource,
+                destination,
+                replacedBlank = false
+            )
+            lastActiveLine = remapLineAfterMove(
+                lastActiveLine,
+                currentSource,
+                destination,
+                replacedBlank = false
+            ) ?: 0
+            clearAssetTransfer()
+            refreshRows()
+            scheduleSave()
+            Toast.makeText(this, R.string.asset_moved, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (workspace.resolveAsset(transfer.assetPath) == null) {
+            clearAssetTransfer()
+            Toast.makeText(this, R.string.asset_clipboard_unavailable, Toast.LENGTH_LONG).show()
+            return
+        }
+        val pasted = document.pasteAtInsertion(boundary, transfer.source)
+        val insertedLineCount = pasted.count()
+        activeLine = activeLine?.let { active ->
+            if (active >= pasted.first) active + insertedLineCount else active
+        }
+        lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+        clearAssetTransfer()
+        refreshRows()
+        scheduleSave()
+        Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun clearAssetTransfer() {
+        pendingAssetTransfer = null
+        if (::noteAdapter.isInitialized) noteAdapter.setTransferTarget(null)
     }
 
     private fun remapLineAfterMove(

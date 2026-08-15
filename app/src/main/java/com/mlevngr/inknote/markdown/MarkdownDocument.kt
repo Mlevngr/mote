@@ -73,6 +73,30 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return insertion
     }
 
+    /** Moves one line to an exact boundary between lines. Boundary 0 is document start. */
+    fun moveLineToInsertion(sourceIndex: Int, boundaryIndex: Int): Int {
+        require(sourceIndex in lines.indices) { "Source line index is out of bounds" }
+        require(boundaryIndex in 0..lines.size) { "Insertion boundary is out of bounds" }
+        if (lines.size == 1) return 0
+
+        val source = lines.removeAt(sourceIndex)
+        val insertion = (boundaryIndex - if (boundaryIndex > sourceIndex) 1 else 0)
+            .coerceIn(0, lines.size)
+        lines.add(insertion, source)
+        return insertion
+    }
+
+    /** Pastes source at an exact boundary between lines. Boundary 0 is document start. */
+    fun pasteAtInsertion(boundaryIndex: Int, source: String): IntRange {
+        require(boundaryIndex in 0..lines.size) { "Insertion boundary is out of bounds" }
+        val replacement = source.replace("\r\n", "\n").replace('\r', '\n')
+            .split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
+        if (lines.size == 1 && lines[0].isBlank()) return replaceLine(0, replacement)
+
+        lines.addAll(boundaryIndex, replacement)
+        return boundaryIndex until boundaryIndex + replacement.size
+    }
+
     /** Pastes into a blank target line, or directly after a non-blank target line. */
     fun pasteAt(targetLine: Int?, source: String): IntRange {
         val replacement = source.replace("\r\n", "\n").replace('\r', '\n')
