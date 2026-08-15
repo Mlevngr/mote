@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.mlevngr.inknote.assets.NoteWorkspace
+import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
@@ -54,8 +55,19 @@ class EditorActivity : AppCompatActivity() {
                 finish()
                 return
             }
-        workspace = NoteWorkspace(this, notePath)
-        document = MarkdownDocument.parse(workspace.load(DEFAULT_NOTE))
+        val initialState = runCatching {
+            NoteWorkspace(this, notePath).let { it to MarkdownDocument.parse(it.load(DEFAULT_NOTE)) }
+        }.getOrElse {
+            Toast.makeText(
+                this,
+                getString(R.string.open_failed, it.message ?: getString(R.string.unknown_error)),
+                Toast.LENGTH_LONG
+            ).show()
+            finish()
+            return
+        }
+        workspace = initialState.first
+        document = initialState.second
         rowFactory = HybridRowFactory(PreviewRowFactory(workspace))
         noteAdapter = HybridNoteAdapter(
             context = this,
@@ -68,7 +80,7 @@ class EditorActivity : AppCompatActivity() {
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
-            title = notePath.substringAfterLast('/')
+            title = NoteLibrary(this@EditorActivity).displayNameForNote(notePath)
             setNavigationIcon(R.drawable.ic_arrow_back_24)
             navigationContentDescription = getString(R.string.back_to_library)
             setNavigationOnClickListener { finish() }
@@ -230,13 +242,14 @@ class EditorActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        if (!::document.isInitialized || !::workspace.isInitialized) return
         val markdown = document.markdown()
         io.execute { workspace.save(markdown) }
     }
 
     override fun onDestroy() {
         saveTask?.let(main::removeCallbacks)
-        noteAdapter.close()
+        if (::noteAdapter.isInitialized) noteAdapter.close()
         io.shutdown()
         super.onDestroy()
     }

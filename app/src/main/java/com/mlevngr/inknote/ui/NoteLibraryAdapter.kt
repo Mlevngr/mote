@@ -6,15 +6,18 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.library.NoteLibrary
 
 class NoteLibraryAdapter(
     private val context: Context,
-    private val onClick: (NoteLibrary.Entry) -> Unit
+    private val onClick: (NoteLibrary.Entry) -> Unit,
+    private val onMenu: (NoteLibrary.Entry) -> Unit
 ) : RecyclerView.Adapter<NoteLibraryAdapter.EntryHolder>() {
     private var entries: List<NoteLibrary.Entry> = emptyList()
 
@@ -56,6 +59,16 @@ class NoteLibraryAdapter(
             )
         }
         holder.itemView.setOnClickListener { onClick(entry) }
+        holder.itemView.setOnLongClickListener {
+            if (entry.type == NoteLibrary.EntryType.Note) {
+                onMenu(entry)
+                true
+            } else false
+        }
+        holder.menu.visibility = if (entry.type == NoteLibrary.EntryType.Note) {
+            android.view.View.VISIBLE
+        } else android.view.View.INVISIBLE
+        holder.menu.setOnClickListener { onMenu(entry) }
     }
 
     private fun dp(value: Int): Int = (value * context.resources.displayMetrics.density).toInt()
@@ -83,6 +96,15 @@ class NoteLibraryAdapter(
             textSize = 13f
             maxLines = 1
             labels.addView(this)
+        }
+        val menu = ImageButton(context).apply {
+            setImageResource(R.drawable.ic_more_vert_24)
+            setColorFilter(context.getColor(R.color.text_secondary))
+            background = TypedValue().also {
+                context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, it, true)
+            }.let { AppCompatResources.getDrawable(context, it.resourceId) }
+            contentDescription = context.getString(R.string.note_actions)
+            container.addView(this, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
     }
 }

@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.5.0 APK](https://github.com/Mlevngr/note/releases/download/v0.5.0/InkNote-0.5.0.apk)**
+**[直接下载 InkNote 0.5.1 APK](https://github.com/Mlevngr/note/releases/download/v0.5.1/InkNote-0.5.1.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -43,7 +43,9 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 右上角分别提供“新建文件夹”和“新建笔记”。
 - 文件夹可以嵌套，工具栏显示当前位置并提供返回上级按钮。
 - 文件夹始终排在笔记前面；点击文件夹进入，点击笔记打开编辑器。
-- 重名项目会自动生成为 `名称 (2)`，不会覆盖已有内容。
+- 笔记与文件夹可以使用相同显示名称；同类型重名会从 `名称 (1)` 开始编号，不会覆盖已有内容。
+- 点击笔记右侧的更多按钮或长按笔记，可以选择目标文件夹移动笔记；Markdown 与 assets 会整体移动。
+- 新建文件夹和笔记使用 Material 轮廓输入框，标签、边框与输入文字互不重叠。
 - 旧版本的 `welcome` 笔记会自动出现在根目录，不迁移、不删除原数据。
 - 目录路径经过规范化检查，不能通过名称越过笔记库目录。
 
@@ -82,11 +84,13 @@ files/notes/
 ├── welcome/
 │   ├── note.md
 │   └── assets/
-└── 工作/
-    └── 计划/
+└── 工作.folder/
+    └── 计划.note/
         ├── note.md
         └── assets/
 ```
+
+`.folder` 与 `.note` 只用于内部区分类型，界面不会显示；旧版本没有后缀的笔记仍然兼容。
 
 ## 构建
 

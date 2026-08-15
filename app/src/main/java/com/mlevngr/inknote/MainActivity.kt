@@ -1,7 +1,8 @@
 package com.mlevngr.inknote
 
 import android.os.Bundle
-import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -11,6 +12,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.SystemBarInsets
@@ -29,7 +32,7 @@ class MainActivity : AppCompatActivity() {
 
         library = NoteLibrary(this)
         currentFolder = savedInstanceState?.getString(STATE_FOLDER).orEmpty()
-        adapter = NoteLibraryAdapter(this, ::openEntry)
+        adapter = NoteLibraryAdapter(this, ::openEntry, ::showNoteActions)
         toolbar = findViewById(R.id.library_toolbar)
         emptyView = findViewById(R.id.empty_library)
         findViewById<RecyclerView>(R.id.library_list).apply {
@@ -67,26 +70,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
-        val entries = runCatching { library.list(currentFolder) }.getOrElse {
+        val entries = runCatching { library.list(currentFolder) }.getOrElse { error ->
             currentFolder = ""
-            library.list("")
+            Toast.makeText(
+                this,
+                getString(R.string.open_failed, error.message ?: getString(R.string.unknown_error)),
+                Toast.LENGTH_LONG
+            ).show()
+            runCatching { library.list("") }.getOrDefault(emptyList())
         }
         adapter.submit(entries)
         emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
         else android.view.View.GONE
-        toolbar.title = currentFolder.substringAfterLast('/').ifBlank { getString(R.string.app_name) }
-        toolbar.navigationIcon = if (currentFolder.isBlank()) null
-        else getDrawable(R.drawable.ic_arrow_back_24)
+        toolbar.title = library.displayPath(currentFolder)
+            .substringAfterLast(" / ")
+            .ifBlank { getString(R.string.app_name) }
+        if (currentFolder.isBlank()) toolbar.navigationIcon = null
+        else toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
         toolbar.navigationContentDescription = getString(R.string.go_up)
     }
 
     private fun openEntry(entry: NoteLibrary.Entry) {
-        when (entry.type) {
-            NoteLibrary.EntryType.Folder -> {
-                currentFolder = entry.relativePath
-                refresh()
+        runCatching {
+            when (entry.type) {
+                NoteLibrary.EntryType.Folder -> {
+                    library.list(entry.relativePath)
+                    currentFolder = entry.relativePath
+                    refresh()
+                }
+                NoteLibrary.EntryType.Note -> {
+                    library.requireNote(entry.relativePath)
+                    startActivity(EditorActivity.intent(this, entry.relativePath))
+                }
             }
-            NoteLibrary.EntryType.Note -> startActivity(EditorActivity.intent(this, entry.relativePath))
+        }.onFailure {
+            Toast.makeText(
+                this,
+                getString(R.string.open_failed, it.message ?: getString(R.string.unknown_error)),
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -96,31 +118,82 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCreateDialog(type: CreateType) {
-        val input = EditText(this).apply {
-            hint = getString(if (type == CreateType.Folder) R.string.folder_name else R.string.note_name)
+        val input = TextInputEditText(this).apply {
             setSingleLine()
-            val padding = (24 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding / 2, padding, 0)
         }
-        MaterialAlertDialogBuilder(this)
+        val inputLayout = TextInputLayout(this).apply {
+            hint = getString(if (type == CreateType.Folder) R.string.folder_name else R.string.note_name)
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            addView(input, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+        val margin = (24 * resources.displayMetrics.density).toInt()
+        val container = FrameLayout(this).apply {
+            addView(inputLayout, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = margin
+                marginEnd = margin
+                topMargin = margin / 2
+            })
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(if (type == CreateType.Folder) R.string.create_folder else R.string.create_note)
-            .setView(input)
+            .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.create) { _, _ ->
+            .setPositiveButton(R.string.create, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
                 runCatching {
                     when (type) {
                         CreateType.Folder -> library.createFolder(currentFolder, input.text.toString())
                         CreateType.Note -> library.createNote(currentFolder, input.text.toString())
                     }
                 }.onSuccess { entry ->
+                    dialog.dismiss()
                     refresh()
                     if (entry.type == NoteLibrary.EntryType.Note) openEntry(entry)
                 }.onFailure {
+                    inputLayout.error = it.message ?: getString(R.string.create_failed)
                     Toast.makeText(this, it.message ?: getString(R.string.create_failed), Toast.LENGTH_LONG).show()
                 }
             }
-            .show()
+        }
+        dialog.show()
         input.requestFocus()
+    }
+
+    private fun showNoteActions(entry: NoteLibrary.Entry) {
+        if (entry.type != NoteLibrary.EntryType.Note) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(entry.name)
+            .setItems(arrayOf(getString(R.string.move_note))) { _, _ -> showMoveDialog(entry) }
+            .show()
+    }
+
+    private fun showMoveDialog(note: NoteLibrary.Entry) {
+        val destinations = listOf<String?>(null) + library.listFolders().map { it.relativePath }
+        val labels = destinations.map { path ->
+            path?.let(library::displayPath) ?: getString(R.string.library_root)
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.move_to)
+            .setItems(labels) { _, which ->
+                val target = destinations[which].orEmpty()
+                runCatching { library.moveNote(note.relativePath, target) }
+                    .onSuccess {
+                        refresh()
+                        Toast.makeText(this, getString(R.string.note_moved), Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        Toast.makeText(this, it.message ?: getString(R.string.move_failed), Toast.LENGTH_LONG).show()
+                    }
+            }
+            .show()
     }
 
     private enum class CreateType { Folder, Note }
