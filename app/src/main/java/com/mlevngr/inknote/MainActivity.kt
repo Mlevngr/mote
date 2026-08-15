@@ -5,12 +5,13 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -21,6 +22,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -343,52 +345,61 @@ class MainActivity : AppCompatActivity() {
         val colors = FolderColor.entries
         val descriptions = arrayOf(
             getString(R.string.folder_color_blue),
+            getString(R.string.folder_color_indigo),
             getString(R.string.folder_color_purple),
             getString(R.string.folder_color_pink),
+            getString(R.string.folder_color_red),
             getString(R.string.folder_color_orange),
+            getString(R.string.folder_color_amber),
             getString(R.string.folder_color_green),
+            getString(R.string.folder_color_teal),
+            getString(R.string.folder_color_cyan),
+            getString(R.string.folder_color_brown),
             getString(R.string.folder_color_gray)
         )
+        val primary = ThemeColors.resolve(this, androidx.appcompat.R.attr.colorPrimary)
+        val surface = ThemeColors.resolve(this, com.google.android.material.R.attr.colorSurfaceContainer)
+        val outline = ThemeColors.resolve(this, com.google.android.material.R.attr.colorOutline)
+        val textPrimary = ThemeColors.resolve(this, R.attr.inkNoteTextPrimary)
         val grid = GridLayout(this).apply {
-            columnCount = 3
-            val horizontal = 20.dp
-            val vertical = 12.dp
-            setPadding(horizontal, vertical, horizontal, vertical)
+            columnCount = 4
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            setPadding(16.dp, 10.dp, 16.dp, 12.dp)
         }
         colors.forEachIndexed { index, color ->
             val selected = color == folder.folderColor
             val fill = folderColorValue(color)
-            val circle = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(fill)
-                setStroke(if (selected) 4.dp else 1.dp, if (selected) {
-                    ThemeColors.resolve(this@MainActivity, R.attr.inkNoteTextPrimary)
-                } else Color.TRANSPARENT)
-            }
-            val mask = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.WHITE)
-            }
-            val button = AppCompatImageButton(this).apply {
-                background = RippleDrawable(
-                    ColorStateList.valueOf(
-                        ColorUtils.setAlphaComponent(
-                            ThemeColors.resolve(this@MainActivity, R.attr.inkNoteTextPrimary),
-                            36
+            val swatch = FrameLayout(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(fill)
+                    setStroke(1.dp, ColorUtils.setAlphaComponent(textPrimary, 32))
+                }
+                if (selected) {
+                    addView(ImageView(this@MainActivity).apply {
+                        setImageResource(R.drawable.ic_check_24)
+                        imageTintList = ColorStateList.valueOf(
+                            if (ColorUtils.calculateLuminance(fill) > 0.45) Color.BLACK else Color.WHITE
                         )
-                    ),
-                    circle,
-                    mask
-                )
-                contentDescription = descriptions[index]
-                setPadding(16.dp, 16.dp, 16.dp, 16.dp)
-                if (selected) setImageResource(R.drawable.ic_check_24) else setImageDrawable(null)
-                imageTintList = ColorStateList.valueOf(
-                    if (ColorUtils.calculateLuminance(fill) > 0.45) Color.BLACK else Color.WHITE
-                )
+                        contentDescription = null
+                    }, FrameLayout.LayoutParams(22.dp, 22.dp, Gravity.CENTER))
+                }
             }
-            grid.addView(button, GridLayout.LayoutParams().apply {
-                width = 72.dp
+            val card = MaterialCardView(this).apply {
+                radius = 20.dp.toFloat()
+                cardElevation = 0f
+                setCardBackgroundColor(surface)
+                strokeWidth = if (selected) 2.dp else 1.dp
+                setStrokeColor(if (selected) primary else ColorUtils.setAlphaComponent(outline, 130))
+                rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(primary, 30))
+                isClickable = true
+                isFocusable = true
+                tag = color
+                contentDescription = getString(R.string.folder_color_option, descriptions[index])
+                addView(swatch, FrameLayout.LayoutParams(42.dp, 42.dp, Gravity.CENTER))
+            }
+            grid.addView(card, GridLayout.LayoutParams().apply {
+                width = 64.dp
                 height = 64.dp
                 setMargins(4.dp, 4.dp, 4.dp, 4.dp)
             })
@@ -400,8 +411,8 @@ class MainActivity : AppCompatActivity() {
             .create()
         grid.children().forEach { child ->
             child.setOnClickListener {
-                val index = grid.indexOfChild(child)
-                runCatching { library.setFolderColor(currentFolder, folder.name, colors[index]) }
+                val color = child.tag as FolderColor
+                runCatching { library.setFolderColor(currentFolder, folder.name, color) }
                     .onSuccess { refresh() }
                     .onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
                 dialog.dismiss()
