@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mlevngr.inknote.assets.NoteWorkspace
+import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
@@ -58,6 +59,7 @@ class EditorActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppearancePreferences(this).applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_editor)
         SystemBarInsets.install(

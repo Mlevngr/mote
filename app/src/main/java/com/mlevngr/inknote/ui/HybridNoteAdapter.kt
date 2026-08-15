@@ -30,6 +30,7 @@ import androidx.core.content.getSystemService
 import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
+import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import com.mlevngr.inknote.ui.AssetPreviewVisibility.AssetInstanceKey
 import io.noties.markwon.Markwon
@@ -158,7 +159,7 @@ class HybridNoteAdapter(
                 minHeight = dp(112)
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 textSize = 13f
-                setTextColor(context.getColor(R.color.text_secondary))
+                setTextColor(ThemeColors.resolve(context, R.attr.inkNoteTextSecondary))
                 text = context.getString(R.string.document_end_hint)
                 contentDescription = context.getString(R.string.document_end_hint)
             })
@@ -208,7 +209,7 @@ class HybridNoteAdapter(
                         } else null
                         holder.text.setOnLongClickListener(pasteListener)
                         holder.itemView.setOnLongClickListener(pasteListener)
-                        holder.text.setTextColor(context.getColor(R.color.text_primary))
+                        holder.text.setTextColor(ThemeColors.resolve(context, R.attr.inkNoteTextPrimary))
                         markwon.setMarkdown(holder.text, preview.source)
                     }
                     is PreviewRow.Attachment -> {
@@ -222,7 +223,7 @@ class HybridNoteAdapter(
                             preview.file,
                             preview.label
                         )
-                        holder.text.setTextColor(context.getColor(R.color.primary))
+                        holder.text.setTextColor(ThemeColors.resolve(context, androidx.appcompat.R.attr.colorPrimary))
                         holder.text.text = "📎  ${preview.label}  •  ${formatSize(preview.file.length())}"
                     }
                     is PreviewRow.Error -> {
@@ -231,7 +232,7 @@ class HybridNoteAdapter(
                         val pasteListener = pasteAtBoundaryListener(row.lineIndex)
                         holder.text.setOnLongClickListener(pasteListener)
                         holder.itemView.setOnLongClickListener(pasteListener)
-                        holder.text.setTextColor(context.getColor(R.color.error_text))
+                        holder.text.setTextColor(ThemeColors.resolve(context, R.attr.inkNoteErrorText))
                         holder.text.text = preview.message
                     }
                     is PreviewRow.Image -> {
@@ -565,12 +566,12 @@ class HybridNoteAdapter(
             gravity = Gravity.CENTER_VERTICAL
         }
         val caption = TextView(container.context).apply {
-            setTextColor(container.context.getColor(R.color.text_secondary))
+            setTextColor(ThemeColors.resolve(container.context, R.attr.inkNoteTextSecondary))
             textSize = 13f
         }
         val menu = AppCompatImageButton(container.context).apply {
             setImageResource(R.drawable.ic_more_vert_24)
-            setColorFilter(container.context.getColor(R.color.text_secondary))
+            setColorFilter(ThemeColors.resolve(container.context, R.attr.inkNoteTextSecondary))
             contentDescription = container.context.getString(R.string.asset_actions)
             val backgroundValue = TypedValue()
             container.context.theme.resolveAttribute(
@@ -583,7 +584,7 @@ class HybridNoteAdapter(
         val image = ImageView(container.context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(container.context.getColor(R.color.preview_background))
+            setBackgroundColor(ThemeColors.resolve(container.context, R.attr.inkNotePreviewBackground))
             contentDescription = "Embedded note asset"
         }
 

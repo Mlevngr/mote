@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="inkNoteAppBackground" format="color" />
+    <attr name="inkNoteToolbarBackground" format="color" />
+    <attr name="inkNoteEditorBackground" format="color" />
+    <attr name="inkNoteEditorBorder" format="color" />
+    <attr name="inkNotePreviewBackground" format="color" />
+    <attr name="inkNoteCardBackground" format="color" />
+    <attr name="inkNoteTextPrimary" format="color" />
+    <attr name="inkNoteTextSecondary" format="color" />
+    <attr name="inkNoteErrorText" format="color" />
+</resources>

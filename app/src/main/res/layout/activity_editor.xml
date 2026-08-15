@@ -10,9 +10,9 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/toolbar_background"
-        app:navigationIconTint="@color/text_primary"
-        app:titleTextColor="@color/text_primary">
+        android:background="?attr/inkNoteToolbarBackground"
+        app:navigationIconTint="?attr/inkNoteTextPrimary"
+        app:titleTextColor="?attr/inkNoteTextPrimary">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -58,8 +58,8 @@
         android:paddingEnd="18dp"
         android:paddingBottom="8dp"
         android:singleLine="true"
-        android:textColor="@color/text_primary"
-        android:textColorHint="@color/text_secondary"
+        android:textColor="?attr/inkNoteTextPrimary"
+        android:textColorHint="?attr/inkNoteTextSecondary"
         android:textSize="28sp"
         android:textStyle="bold" />
 
