@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.5.7 APK](https://github.com/Mlevngr/note/releases/download/v0.5.7/InkNote-0.5.7.apk)**
+**[直接下载 InkNote 0.5.8 APK](https://github.com/Mlevngr/note/releases/download/v0.5.8/InkNote-0.5.8.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -18,6 +18,9 @@
 
 InkNote 有清晰的阅读、编辑两种模式：
 
+- 笔记文件名就是标题；顶部标题与 Markdown 正文是两个独立编辑区域。
+- 在编辑模式下可直接修改标题，修改后会同步重命名笔记；正文行首退格不会删入标题。
+- 旧版本自动写入正文的同名 `# 标题` 会在首次打开时一次性分离，不会与文件名重复。
 - 阅读模式没有光标，所有行都是渲染结果。
 - 编辑模式只有光标所在行显示 Markdown 源码，其他行继续显示渲染结果。
 - 点击另一行会直接移动编辑位置，不需要点击“完成”。
@@ -90,6 +93,7 @@ files/notes/
 │   └── assets/
 └── 工作.folder/
     └── 计划.note/
+        ├── .body-title-separated-v1
         ├── note.md
         └── assets/
 ```

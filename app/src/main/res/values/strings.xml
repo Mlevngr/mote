@@ -11,6 +11,7 @@
     <string name="create_note">新建笔记</string>
     <string name="folder_name">文件夹名称</string>
     <string name="note_name">笔记名称</string>
+    <string name="note_title_hint">标题</string>
     <string name="create">创建</string>
     <string name="create_failed">创建失败</string>
     <string name="folder">文件夹</string>

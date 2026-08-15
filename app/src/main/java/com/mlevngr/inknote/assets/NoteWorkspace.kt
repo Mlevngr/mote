@@ -6,17 +6,25 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
+import com.mlevngr.inknote.markdown.LegacyNoteBodyMigration
 import java.io.File
 import java.util.UUID
 
-class NoteWorkspace(context: Context, folderLocation: FolderLocation, noteName: String) {
+class NoteWorkspace(context: Context, folderLocation: FolderLocation, private val noteName: String) {
     val root = NoteLibrary(context).findNoteDirectory(folderLocation, noteName)
     private val assets = File(root, "assets").also(File::mkdirs)
     private val markdownFile = File(root, "note.md")
+    private val bodySeparationMarker = File(root, NoteLibrary.BODY_SEPARATION_MARKER)
 
     fun load(defaultValue: String): String {
         if (!markdownFile.exists()) save(defaultValue)
-        return markdownFile.readText()
+        val markdown = markdownFile.readText()
+        if (bodySeparationMarker.exists()) return markdown
+
+        val separated = LegacyNoteBodyMigration.separateTitle(markdown, noteName)
+        if (separated != markdown) save(separated)
+        bodySeparationMarker.writeText("")
+        return separated
     }
 
     fun save(markdown: String) {

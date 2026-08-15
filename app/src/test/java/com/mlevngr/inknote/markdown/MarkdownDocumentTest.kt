@@ -37,6 +37,12 @@ class MarkdownDocumentTest {
         assertEquals(null, document.mergeWithPrevious(0))
     }
 
+    @Test fun backspaceCannotMergeTheFirstBodyLineIntoTheSeparateTitle() {
+        val document = MarkdownDocument.parse("Body")
+        assertEquals(null, document.mergeWithPrevious(0))
+        assertEquals("Body", document.markdown())
+    }
+
     @Test fun replacesOneEditorLineWithPastedLines() {
         val document = MarkdownDocument.parse("Before\nOld\nAfter")
         assertEquals(1..3, document.replaceLine(1, listOf("One", "Two", "Three")))

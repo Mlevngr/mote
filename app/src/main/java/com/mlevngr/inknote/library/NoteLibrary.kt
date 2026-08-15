@@ -56,7 +56,8 @@ class NoteLibrary internal constructor(private val root: File) {
         val note = uniqueTypedChild(parent, name, EntryType.Note)
         check(note.mkdir()) { "无法创建笔记" }
         File(note, ASSETS_DIRECTORY).mkdirs()
-        File(note, NOTE_FILE).writeText("# $name\n")
+        File(note, NOTE_FILE).writeText("")
+        File(note, BODY_SEPARATION_MARKER).writeText("")
         return noteEntry(note)
     }
 
@@ -248,6 +249,7 @@ class NoteLibrary internal constructor(private val root: File) {
     companion object {
         const val NOTE_FILE = "note.md"
         const val ASSETS_DIRECTORY = "assets"
+        const val BODY_SEPARATION_MARKER = ".body-title-separated-v1"
         private const val NOTE_DIRECTORY_SUFFIX = ".note"
         private const val FOLDER_DIRECTORY_SUFFIX = ".folder"
         private const val MAX_NAME_LENGTH = 80

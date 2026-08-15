@@ -28,7 +28,8 @@ class NoteLibraryTest {
         assertEquals(listOf("Work", "Ideas"), entries.map { it.name })
         assertEquals(NoteLibrary.EntryType.Folder, entries[0].type)
         assertEquals(NoteLibrary.EntryType.Note, entries[1].type)
-        assertTrue(File(root, "Ideas.note/note.md").readText().startsWith("# Ideas"))
+        assertEquals("", File(root, "Ideas.note/note.md").readText())
+        assertTrue(File(root, "Ideas.note/${NoteLibrary.BODY_SEPARATION_MARKER}").isFile)
         assertEquals(rootLocation, rootLocation.child(folder.name).parent())
     }
 
