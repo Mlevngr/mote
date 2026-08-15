@@ -35,6 +35,7 @@ import java.util.concurrent.Executors
 class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
+    private val onLongActivate: (Int) -> Unit,
     private val onLineChanged: (Int, String) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
@@ -120,6 +121,12 @@ class HybridNoteAdapter(
                 holder.itemView.setOnClickListener(if (editing) {
                     { onActivate(row.lineIndex) }
                 } else null)
+                holder.itemView.setOnLongClickListener(if (!editing) {
+                    {
+                        onLongActivate(row.lineIndex)
+                        true
+                    }
+                } else null)
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
@@ -145,6 +152,7 @@ class HybridNoteAdapter(
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         holder.itemView.setOnClickListener(null)
+        holder.itemView.setOnLongClickListener(null)
         if (holder is EditorHolder) holder.detach()
         if (holder is AssetHolder) {
             holder.image.tag = null

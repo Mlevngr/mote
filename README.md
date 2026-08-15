@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.3.0 APK](https://github.com/Mlevngr/note/releases/download/v0.3.0/InkNote-0.3.0-debug.apk)**
+**[直接下载 InkNote 0.3.1 APK](https://github.com/Mlevngr/note/releases/download/v0.3.1/InkNote-0.3.1-debug.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用 Android Debug 签名，适合当前测试阶段直接安装。
 
@@ -17,6 +17,7 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 阅读模式没有光标，所有行都是渲染结果。
 - 编辑模式只有光标所在行显示 Markdown 源码，其他行继续显示渲染结果。
 - 点击另一行会直接移动编辑位置，不需要点击“完成”。
+- 阅读模式下长按任意行会直接进入编辑模式并定位到该行。
 - 在当前行按回车会拆分并进入下一行。
 - 右上角的书写/阅读图标切换模式，链接形状的图标统一负责插入文件。
 

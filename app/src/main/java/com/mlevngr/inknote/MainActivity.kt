@@ -11,6 +11,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.getSystemService
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
@@ -44,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        installSystemBarInsets()
 
         workspace = NoteWorkspace(this)
         document = MarkdownDocument.parse(workspace.load(DEFAULT_NOTE))
@@ -51,6 +55,7 @@ class MainActivity : AppCompatActivity() {
         noteAdapter = HybridNoteAdapter(
             context = this,
             onActivate = ::activateLine,
+            onLongActivate = ::enterEditModeAt,
             onLineChanged = ::updateLine,
             onSplitLine = ::splitLine
         )
@@ -86,10 +91,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterEditMode() {
+        enterEditModeAt(lastActiveLine)
+    }
+
+    private fun enterEditModeAt(lineIndex: Int) {
         mode = EditorMode.Edit
-        activeLine = lastActiveLine.coerceIn(0, document.size - 1)
+        activeLine = lineIndex.coerceIn(0, document.size - 1)
+        lastActiveLine = activeLine ?: 0
         updateModeButton()
         refreshRows(requestFocus = true)
+    }
+
+    private fun installSystemBarInsets() {
+        val root = findViewById<android.view.View>(R.id.app_root)
+        val initial = Insets.of(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
+            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                initial.left + bars.left,
+                initial.top + bars.top,
+                initial.right + bars.right,
+                initial.bottom + bars.bottom
+            )
+            windowInsets
+        }
+        ViewCompat.requestApplyInsets(root)
     }
 
     private fun enterReadMode() {
