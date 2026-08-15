@@ -59,6 +59,34 @@ class MarkdownDocumentTest {
         assertEquals("Before\nAfter", document.markdown())
     }
 
+    @Test fun movesALineDownWithoutLeavingACopy() {
+        val document = MarkdownDocument.parse("Before\nAsset\nMiddle\nAfter")
+
+        assertEquals(3, document.moveLineToPasteTarget(1, 3))
+        assertEquals(listOf("Before", "Middle", "After", "Asset"), document.snapshot())
+    }
+
+    @Test fun movesALineUpWithoutLeavingACopy() {
+        val document = MarkdownDocument.parse("Before\nMiddle\nAsset\nAfter")
+
+        assertEquals(1, document.moveLineToPasteTarget(2, 0))
+        assertEquals(listOf("Before", "Asset", "Middle", "After"), document.snapshot())
+    }
+
+    @Test fun movingToABlankLineReplacesThatTarget() {
+        val document = MarkdownDocument.parse("Before\nAsset\nMiddle\n\nAfter")
+
+        assertEquals(2, document.moveLineToPasteTarget(1, 3))
+        assertEquals(listOf("Before", "Middle", "Asset", "After"), document.snapshot())
+    }
+
+    @Test fun movingOntoTheSourceDoesNotDuplicateIt() {
+        val document = MarkdownDocument.parse("Before\nAsset\nAfter")
+
+        assertEquals(1, document.moveLineToPasteTarget(1, 1))
+        assertEquals(listOf("Before", "Asset", "After"), document.snapshot())
+    }
+
     @Test fun removingTheOnlyLineLeavesAnEditableEmptyBody() {
         val document = MarkdownDocument.parse("Only line")
         document.removeLine(0)

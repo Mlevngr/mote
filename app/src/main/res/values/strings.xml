@@ -14,6 +14,8 @@
     <string name="copy_inserted_file">复制</string>
     <string name="asset_ready_to_move">已选择移动，在空白行或正文末尾长按粘贴</string>
     <string name="asset_copied">已复制，在空白行或正文末尾长按粘贴</string>
+    <string name="asset_moved">已移动</string>
+    <string name="asset_move_source_unavailable">原附件位置已变化，已取消移动以避免错误地创建副本。</string>
     <string name="paste">粘贴</string>
     <string name="nothing_to_paste">剪贴板中没有可粘贴的内容</string>
     <string name="pasted">已粘贴</string>

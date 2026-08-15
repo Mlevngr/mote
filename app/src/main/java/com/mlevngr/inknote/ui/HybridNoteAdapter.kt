@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -14,6 +15,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -39,7 +41,7 @@ import java.util.concurrent.Executors
 class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
-    private val onLongActivate: (Int) -> Unit,
+    private val onPreviewDoubleTap: (Int) -> Unit,
     private val onLineChanged: (Int, String) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
@@ -149,17 +151,14 @@ class HybridNoteAdapter(
         when (val row = rows[position]) {
             is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
             is HybridRow.Rendered -> {
-                holder.itemView.setOnClickListener(if (editing) {
-                    { onActivate(row.lineIndex) }
-                } else null)
+                val activationListener = activationListener(row.lineIndex)
+                holder.itemView.setOnClickListener(activationListener)
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
                         val blank = preview.source == "\u00a0"
                         holder.text.setTextIsSelectable(!editing && !blank)
-                        holder.text.setOnClickListener(if (editing) {
-                            { onActivate(row.lineIndex) }
-                        } else null)
+                        holder.text.setOnClickListener(activationListener)
                         val pasteListener = if (blank) {
                             View.OnLongClickListener { onPasteAt(row.lineIndex); true }
                         } else null
@@ -186,9 +185,7 @@ class HybridNoteAdapter(
                         holder as TextHolder
                         holder.text.setTextIsSelectable(false)
                         holder.text.setOnLongClickListener(null)
-                        holder.itemView.setOnLongClickListener(if (!editing) {
-                            { onLongActivate(row.lineIndex); true }
-                        } else null)
+                        holder.itemView.setOnLongClickListener(null)
                         holder.text.setTextColor(context.getColor(R.color.error_text))
                         holder.text.text = preview.message
                     }
@@ -218,6 +215,15 @@ class HybridNoteAdapter(
                     }
                 }
             }
+        }
+    }
+
+    private fun activationListener(lineIndex: Int): View.OnClickListener {
+        if (editing) return View.OnClickListener { onActivate(lineIndex) }
+
+        val gate = DoubleTapGate(ViewConfiguration.getDoubleTapTimeout().toLong())
+        return View.OnClickListener {
+            if (gate.registerTap(SystemClock.uptimeMillis())) onPreviewDoubleTap(lineIndex)
         }
     }
 

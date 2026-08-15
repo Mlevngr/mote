@@ -99,7 +99,7 @@ class EditorActivity : AppCompatActivity() {
         noteAdapter = HybridNoteAdapter(
             context = this,
             onActivate = ::activateLine,
-            onLongActivate = ::enterEditModeAt,
+            onPreviewDoubleTap = ::enterEditModeAt,
             onLineChanged = ::updateLine,
             onSplitLine = ::splitLine,
             onMultilineInput = ::replaceLineFromEditor,
@@ -426,28 +426,42 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun pasteAt(targetLine: Int, clipboardText: String?) {
-        val transfer = pendingAssetTransfer?.takeIf { pending ->
-            clipboardText == null || clipboardText == pending.source
+        val stagedTransfer = pendingAssetTransfer
+        val transfer = stagedTransfer?.takeIf { pending ->
+            pending.move || clipboardText == null || clipboardText == pending.source
         }
-        if (pendingAssetTransfer != null && transfer == null) pendingAssetTransfer = null
-        var target = targetLine.coerceIn(0, document.size - 1)
-        val source = if (transfer != null) {
-            if (transfer.move) {
-                val currentSource = locateTransferSource(transfer)
-                if (currentSource >= 0) {
-                    document.removeLine(currentSource)
-                    activeLine = activeLine?.let { active ->
-                        when {
-                            active > currentSource -> active - 1
-                            active == currentSource -> null
-                            else -> active
-                        }
-                    }
-                    if (target > currentSource) target--
-                }
+        if (stagedTransfer != null && transfer == null) pendingAssetTransfer = null
+        val target = targetLine.coerceIn(0, document.size - 1)
+        if (transfer?.move == true) {
+            val currentSource = locateTransferSource(transfer)
+            if (currentSource < 0) {
+                pendingAssetTransfer = null
+                Toast.makeText(this, R.string.asset_move_source_unavailable, Toast.LENGTH_LONG)
+                    .show()
+                return
             }
-            transfer.source
-        } else clipboardText.orEmpty()
+            val replacesBlank = target != currentSource && document[target].isBlank()
+            val destination = document.moveLineToPasteTarget(currentSource, target)
+            activeLine = remapLineAfterMove(
+                activeLine,
+                currentSource,
+                destination,
+                replacesBlank
+            )
+            lastActiveLine = remapLineAfterMove(
+                lastActiveLine,
+                currentSource,
+                destination,
+                replacesBlank
+            ) ?: 0
+            pendingAssetTransfer = null
+            refreshRows()
+            scheduleSave()
+            Toast.makeText(this, R.string.asset_moved, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val source = transfer?.source ?: clipboardText.orEmpty()
         if (source.isEmpty()) return
         if (transfer == null) {
             val assetPath = ASSET_EMBED.matchEntire(source.trim())?.groupValues?.get(1)
@@ -460,7 +474,6 @@ class EditorActivity : AppCompatActivity() {
         val sizeBeforePaste = document.size
         val pasted = document.pasteAt(target, source)
         val insertedLineCount = document.size - sizeBeforePaste
-        if (transfer?.move == true) pendingAssetTransfer = null
         activeLine = activeLine?.let { active ->
             if (insertedLineCount > 0 && active >= pasted.first) {
                 active + insertedLineCount
@@ -470,6 +483,21 @@ class EditorActivity : AppCompatActivity() {
         refreshRows()
         scheduleSave()
         Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun remapLineAfterMove(
+        lineIndex: Int?,
+        source: Int,
+        destination: Int,
+        replacedBlank: Boolean
+    ): Int? {
+        lineIndex ?: return null
+        if (source == destination) return lineIndex
+        if (lineIndex == source) return destination
+
+        var mapped = if (lineIndex > source) lineIndex - 1 else lineIndex
+        if (!replacedBlank && mapped >= destination) mapped++
+        return mapped.coerceIn(0, document.size - 1)
     }
 
     private fun locateTransferSource(transfer: AssetTransfer): Int {
