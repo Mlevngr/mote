@@ -110,4 +110,24 @@ class NoteLibraryTest {
 
         assertEquals("Work / Ideas", library.displayPath(child.relativePath))
     }
+
+    @Test fun deletesTheWholeNoteIncludingAssets() {
+        val (root, library) = library()
+        val note = library.createNote("", "Disposable")
+        File(root, "Disposable.note/assets/nested").mkdirs()
+        File(root, "Disposable.note/assets/nested/photo.jpg").writeText("image")
+
+        library.deleteNote(note.relativePath)
+
+        assertTrue(!File(root, "Disposable.note").exists())
+        assertTrue(library.list("").isEmpty())
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun refusesToDeleteFolderAsNote() {
+        val (_, library) = library()
+        val folder = library.createFolder("", "Keep")
+
+        library.deleteNote(folder.relativePath)
+    }
 }

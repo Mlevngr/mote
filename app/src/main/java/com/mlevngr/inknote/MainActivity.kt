@@ -169,9 +169,37 @@ class MainActivity : AppCompatActivity() {
 
     private fun showNoteActions(entry: NoteLibrary.Entry) {
         if (entry.type != NoteLibrary.EntryType.Note) return
+        val actions = arrayOf(getString(R.string.move_note), getString(R.string.delete_note))
         MaterialAlertDialogBuilder(this)
             .setTitle(entry.name)
-            .setItems(arrayOf(getString(R.string.move_note))) { _, _ -> showMoveDialog(entry) }
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> showMoveDialog(entry)
+                    1 -> showDeleteConfirmation(entry)
+                }
+            }
+            .show()
+    }
+
+    private fun showDeleteConfirmation(note: NoteLibrary.Entry) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_note)
+            .setMessage(getString(R.string.delete_note_confirmation, note.name))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                runCatching { library.deleteNote(note.relativePath) }
+                    .onSuccess {
+                        refresh()
+                        Toast.makeText(this, R.string.note_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        Toast.makeText(
+                            this,
+                            it.message ?: getString(R.string.delete_failed),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
             .show()
     }
 

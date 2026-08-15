@@ -21,6 +21,11 @@
     <string name="library_root">笔记库根目录</string>
     <string name="note_moved">笔记已移动</string>
     <string name="move_failed">移动失败</string>
+    <string name="delete_note">删除笔记</string>
+    <string name="delete_note_confirmation">确定永久删除“%1$s”及其中的所有附件吗？此操作无法撤销。</string>
+    <string name="delete">删除</string>
+    <string name="note_deleted">笔记已删除</string>
+    <string name="delete_failed">删除失败</string>
     <string name="open_failed">无法打开：%1$s</string>
     <string name="unknown_error">未知错误</string>
 </resources>
