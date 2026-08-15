@@ -187,7 +187,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_note_confirmation, note.name))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
-                runCatching { library.deleteNote(note.relativePath) }
+                runCatching { library.deleteNote(currentFolder, note.name) }
                     .onSuccess {
                         refresh()
                         Toast.makeText(this, R.string.note_deleted, Toast.LENGTH_SHORT).show()

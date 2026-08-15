@@ -117,7 +117,7 @@ class NoteLibraryTest {
         File(root, "Disposable.note/assets/nested").mkdirs()
         File(root, "Disposable.note/assets/nested/photo.jpg").writeText("image")
 
-        library.deleteNote(note.relativePath)
+        library.deleteNote("", note.name)
 
         assertTrue(!File(root, "Disposable.note").exists())
         assertTrue(library.list("").isEmpty())
@@ -128,6 +128,27 @@ class NoteLibraryTest {
         val (_, library) = library()
         val folder = library.createFolder("", "Keep")
 
-        library.deleteNote(folder.relativePath)
+        library.deleteNote("", folder.name)
+    }
+
+    @Test fun deletesLegacyWelcomeNoteByItsVisibleName() {
+        val (root, library) = library()
+        File(root, "welcome/assets").mkdirs()
+        File(root, "welcome/note.md").writeText("legacy")
+
+        library.deleteNote("", "welcome")
+
+        assertTrue(!File(root, "welcome").exists())
+    }
+
+    @Test fun deletesChineseNamedNoteFromNestedFolder() {
+        val (root, library) = library()
+        val folder = library.createFolder("", "工作")
+        val note = library.createNote(folder.relativePath, "会议记录")
+
+        library.deleteNote(folder.relativePath, note.name)
+
+        assertTrue(!File(root, "工作.folder/会议记录.note").exists())
+        assertTrue(library.list(folder.relativePath).isEmpty())
     }
 }

@@ -103,9 +103,15 @@ class NoteLibrary internal constructor(private val root: File) {
         return noteEntry(destination)
     }
 
-    fun deleteNote(notePath: String) {
-        require(notePath.isNotBlank()) { "无效的笔记路径" }
-        val note = requireNote(notePath)
+    fun deleteNote(folderPath: String, noteName: String) {
+        val folder = requireFolder(folderPath)
+        val matches = folder.listFiles().orEmpty().filter { child ->
+            child.isDirectory &&
+                File(child, NOTE_FILE).isFile &&
+                displayName(child, EntryType.Note) == noteName
+        }
+        require(matches.size == 1) { "笔记不存在或已经移动" }
+        val note = matches.single()
         check(note.deleteRecursively() && !note.exists()) { "无法删除笔记" }
     }
 
