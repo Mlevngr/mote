@@ -44,7 +44,7 @@
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 
-    <com.google.android.material.textfield.TextInputEditText
+    <com.mlevngr.inknote.ui.ImeBackTextInputEditText
         android:id="@+id/note_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

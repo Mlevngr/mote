@@ -19,13 +19,13 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.textfield.TextInputEditText
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
+import com.mlevngr.inknote.ui.ImeBackTextInputEditText
 import com.mlevngr.inknote.ui.PreviewRowFactory
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
@@ -41,7 +41,7 @@ class EditorActivity : AppCompatActivity() {
     private lateinit var rowFactory: HybridRowFactory
     private lateinit var recyclerView: RecyclerView
     private lateinit var modeButton: AppCompatImageButton
-    private lateinit var titleInput: TextInputEditText
+    private lateinit var titleInput: ImeBackTextInputEditText
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val renderRevision = AtomicInteger()
@@ -105,16 +105,18 @@ class EditorActivity : AppCompatActivity() {
             onMultilineInput = ::replaceLineFromEditor,
             onMergeWithPrevious = ::mergeWithPrevious,
             onAssetActions = ::showAssetActions,
-            onPasteAt = ::showPasteAt
+            onPasteAt = ::showPasteAt,
+            onBackFromIme = ::handleBackNavigation
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
             title = ""
             setNavigationIcon(R.drawable.ic_arrow_back_24)
             navigationContentDescription = getString(R.string.back_to_library)
-            setNavigationOnClickListener { finish() }
+            setNavigationOnClickListener { handleBackNavigation() }
         }
-        titleInput = findViewById<TextInputEditText>(R.id.note_title).apply {
+        titleInput = findViewById<ImeBackTextInputEditText>(R.id.note_title).apply {
+            onImeBack = ::handleBackNavigation
             setText(noteName)
             setSelection(text?.length ?: 0)
             setOnLongClickListener {
@@ -153,20 +155,17 @@ class EditorActivity : AppCompatActivity() {
         updateModeButton()
         updateTitleInteraction()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (mode == EditorMode.Edit) {
-                    enterReadMode()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                }
-            }
+            override fun handleOnBackPressed() = handleBackNavigation()
         })
         refreshRows()
     }
 
     private fun toggleMode() {
         if (mode == EditorMode.Read) enterEditMode() else enterReadMode()
+    }
+
+    private fun handleBackNavigation() {
+        if (mode == EditorMode.Edit) enterReadMode() else finish()
     }
 
     private fun enterEditMode() {

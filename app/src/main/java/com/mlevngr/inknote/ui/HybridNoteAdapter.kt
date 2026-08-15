@@ -1,5 +1,6 @@
 package com.mlevngr.inknote.ui
 
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -11,8 +12,12 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.util.LruCache
 import android.util.TypedValue
+import android.view.ActionMode
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -26,7 +31,6 @@ import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.getSystemService
 import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.textfield.TextInputEditText
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import io.noties.markwon.Markwon
@@ -46,7 +50,8 @@ class HybridNoteAdapter(
     private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean,
     private val onAssetActions: (Int, File, String) -> Unit,
-    private val onPasteAt: (Int) -> Unit
+    private val onPasteAt: (Int) -> Unit,
+    private val onBackFromIme: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
@@ -104,6 +109,7 @@ class HybridNoteAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
         when (viewType) {
             TYPE_EDITOR -> EditorHolder(LineEditText(context).apply {
+                onImeBack = onBackFromIme
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -427,8 +433,43 @@ class HybridNoteAdapter(
         }
     }
 
-    private class LineEditText(context: Context) : TextInputEditText(context) {
+    private class LineEditText(context: Context) : ImeBackTextInputEditText(context) {
         var onDeleteAtStart: (() -> Boolean)? = null
+
+        private val selectionAction = object : ActionMode.Callback {
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                menu.add(0, android.R.id.cut, 0, R.string.cut_text)
+                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                menu.add(0, android.R.id.copy, 1, R.string.copy_text)
+                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                menu.add(0, android.R.id.paste, 2, R.string.paste)
+                    .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                menu.add(0, android.R.id.selectAll, 3, R.string.select_all_text)
+                return true
+            }
+
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                menu.findItem(android.R.id.paste)?.isEnabled =
+                    context.getSystemService<ClipboardManager>()?.hasPrimaryClip() == true
+                return true
+            }
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean =
+                when (item.itemId) {
+                    android.R.id.selectAll -> {
+                        setSelection(0, text?.length ?: 0)
+                        true
+                    }
+                    android.R.id.cut, android.R.id.copy, android.R.id.paste -> {
+                        val handled = onTextContextMenuItem(item.itemId)
+                        if (handled) mode.finish()
+                        handled
+                    }
+                    else -> false
+                }
+
+            override fun onDestroyActionMode(mode: ActionMode) = Unit
+        }
 
         private fun deleteAtStart(): Boolean {
             if (selectionStart != 0 || selectionEnd != 0) return false
@@ -438,6 +479,29 @@ class HybridNoteAdapter(
         override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
             if (keyCode == KeyEvent.KEYCODE_DEL && deleteAtStart()) return true
             return super.onKeyDown(keyCode, event)
+        }
+
+        override fun performLongClick(): Boolean =
+            showSelectionActions(selectionStart.coerceAtLeast(0))
+
+        override fun performLongClick(x: Float, y: Float): Boolean =
+            showSelectionActions(textOffset(x, y))
+
+        private fun showSelectionActions(offset: Int): Boolean {
+            val value = text?.toString().orEmpty()
+            val range = TextSelection.wordAt(value, offset) ?: return super.performLongClick()
+            setSelection(range.first, range.last + 1)
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            startActionMode(selectionAction, ActionMode.TYPE_FLOATING)
+            return true
+        }
+
+        private fun textOffset(x: Float, y: Float): Int {
+            val textLayout = layout ?: return selectionStart.coerceAtLeast(0)
+            val vertical = (y - totalPaddingTop + scrollY).toInt().coerceAtLeast(0)
+            val line = textLayout.getLineForVertical(vertical)
+            val horizontal = x - totalPaddingLeft + scrollX
+            return textLayout.getOffsetForHorizontal(line, horizontal)
         }
 
         override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
