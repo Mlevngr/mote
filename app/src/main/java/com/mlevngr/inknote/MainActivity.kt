@@ -1,6 +1,8 @@
 package com.mlevngr.inknote
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -8,25 +10,39 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.mlevngr.inknote.appearance.AppTheme
+import com.mlevngr.inknote.appearance.AppearancePreferences
+import com.mlevngr.inknote.appearance.LibraryLayoutMode
+import com.mlevngr.inknote.appearance.NotePreviewMode
+import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.SystemBarInsets
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 class MainActivity : AppCompatActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var adapter: NoteLibraryAdapter
+    private lateinit var appearance: AppearancePreferences
     private lateinit var toolbar: MaterialToolbar
     private lateinit var emptyView: TextView
+    private lateinit var recyclerView: RecyclerView
     private var currentFolder = FolderLocation.Root
+    private val io = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+    private val refreshRevision = AtomicInteger()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        appearance = AppearancePreferences(this)
+        appearance.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_library)
         SystemBarInsets.install(findViewById(R.id.library_root))
@@ -40,10 +56,13 @@ class MainActivity : AppCompatActivity() {
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
         emptyView = findViewById(R.id.empty_library)
-        findViewById<RecyclerView>(R.id.library_list).apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
+        recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
             itemAnimator = null
+        }
+        configureLibraryLayout()
+        findViewById<AppCompatImageButton>(R.id.appearance).setOnClickListener {
+            showAppearanceDialog()
         }
         findViewById<AppCompatImageButton>(R.id.create_folder).setOnClickListener {
             showCreateDialog(CreateType.Folder)
@@ -74,23 +93,121 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onDestroy() {
+        if (::adapter.isInitialized) adapter.close()
+        io.shutdownNow()
+        super.onDestroy()
+    }
+
     private fun refresh() {
-        val entries = runCatching { library.list(currentFolder) }.getOrElse { error ->
-            currentFolder = FolderLocation.Root
-            Toast.makeText(
-                this,
-                getString(R.string.open_failed, error.message ?: getString(R.string.unknown_error)),
-                Toast.LENGTH_LONG
-            ).show()
-            runCatching { library.list(FolderLocation.Root) }.getOrDefault(emptyList())
+        val requestedFolder = currentFolder
+        val revision = refreshRevision.incrementAndGet()
+        io.execute {
+            val requested = runCatching { library.list(requestedFolder) }
+            val entries = requested.getOrElse { runCatching { library.list(FolderLocation.Root) }.getOrDefault(emptyList()) }
+            main.post {
+                if (revision != refreshRevision.get() || isFinishing || isDestroyed) return@post
+                requested.exceptionOrNull()?.let { error ->
+                    currentFolder = FolderLocation.Root
+                    Toast.makeText(
+                        this,
+                        getString(R.string.open_failed, error.message ?: getString(R.string.unknown_error)),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                adapter.submit(entries, appearance.libraryLayout, appearance.notePreview)
+                emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
+                else android.view.View.GONE
+                toolbar.title = currentFolder.title ?: getString(R.string.app_name)
+                if (currentFolder.names.isEmpty()) toolbar.navigationIcon = null
+                else toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
+                toolbar.navigationContentDescription = getString(R.string.go_up)
+            }
         }
-        adapter.submit(entries)
-        emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
-        else android.view.View.GONE
-        toolbar.title = currentFolder.title ?: getString(R.string.app_name)
-        if (currentFolder.names.isEmpty()) toolbar.navigationIcon = null
-        else toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
-        toolbar.navigationContentDescription = getString(R.string.go_up)
+    }
+
+    private fun configureLibraryLayout() {
+        recyclerView.layoutManager = GridLayoutManager(this, 2).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int = adapter.spanSize(position)
+            }
+        }
+        recyclerView.setPadding(
+            if (appearance.libraryLayout == LibraryLayoutMode.List) 4.dp else 8.dp,
+            4.dp,
+            if (appearance.libraryLayout == LibraryLayoutMode.List) 4.dp else 8.dp,
+            24.dp
+        )
+    }
+
+    private fun showAppearanceDialog() {
+        val items = arrayOf(
+            getString(R.string.theme_setting),
+            getString(R.string.library_layout_setting),
+            getString(R.string.note_preview_setting)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.appearance)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showThemeDialog()
+                    1 -> showLayoutDialog()
+                    2 -> showPreviewDialog()
+                }
+            }
+            .show()
+    }
+
+    private fun showThemeDialog() {
+        val themes = AppTheme.entries
+        val labels = arrayOf(
+            getString(R.string.theme_inknote),
+            getString(R.string.theme_catppuccin),
+            getString(R.string.theme_tokyo_night),
+            getString(R.string.theme_minimal)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.theme_setting)
+            .setSingleChoiceItems(labels, themes.indexOf(appearance.theme)) { dialog, which ->
+                appearance.theme = themes[which]
+                dialog.dismiss()
+                recreate()
+            }
+            .show()
+    }
+
+    private fun showLayoutDialog() {
+        val modes = LibraryLayoutMode.entries
+        val labels = arrayOf(
+            getString(R.string.layout_samsung),
+            getString(R.string.layout_list),
+            getString(R.string.layout_grid)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.library_layout_setting)
+            .setSingleChoiceItems(labels, modes.indexOf(appearance.libraryLayout)) { dialog, which ->
+                appearance.libraryLayout = modes[which]
+                configureLibraryLayout()
+                dialog.dismiss()
+                refresh()
+            }
+            .show()
+    }
+
+    private fun showPreviewDialog() {
+        val modes = NotePreviewMode.entries
+        val labels = arrayOf(
+            getString(R.string.preview_thumbnail),
+            getString(R.string.preview_title_only)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.note_preview_setting)
+            .setSingleChoiceItems(labels, modes.indexOf(appearance.notePreview)) { dialog, which ->
+                appearance.notePreview = modes[which]
+                dialog.dismiss()
+                refresh()
+            }
+            .show()
     }
 
     private fun openEntry(entry: NoteLibrary.Entry) {
@@ -180,6 +297,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             arrayOf(
                 getString(R.string.rename_folder),
+                getString(R.string.folder_color),
                 getString(R.string.move_folder),
                 getString(R.string.delete_folder)
             )
@@ -195,10 +313,32 @@ class MainActivity : AppCompatActivity() {
                     }
                     NoteLibrary.EntryType.Folder -> when (which) {
                         0 -> showRenameDialog(entry)
-                        1 -> showMoveFolderDialog(entry)
-                        2 -> showDeleteFolderConfirmation(entry)
+                        1 -> showFolderColorDialog(entry)
+                        2 -> showMoveFolderDialog(entry)
+                        3 -> showDeleteFolderConfirmation(entry)
                     }
                 }
+            }
+            .show()
+    }
+
+    private fun showFolderColorDialog(folder: NoteLibrary.Entry) {
+        val colors = FolderColor.entries
+        val labels = arrayOf(
+            getString(R.string.folder_color_blue),
+            getString(R.string.folder_color_purple),
+            getString(R.string.folder_color_pink),
+            getString(R.string.folder_color_orange),
+            getString(R.string.folder_color_green),
+            getString(R.string.folder_color_gray)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.folder_color)
+            .setSingleChoiceItems(labels, colors.indexOf(folder.folderColor)) { dialog, which ->
+                runCatching { library.setFolderColor(currentFolder, folder.name, colors[which]) }
+                    .onSuccess { refresh() }
+                    .onFailure { Toast.makeText(this, it.message, Toast.LENGTH_LONG).show() }
+                dialog.dismiss()
             }
             .show()
     }
@@ -367,6 +507,8 @@ class MainActivity : AppCompatActivity() {
         names.size >= ancestor.names.size && names.take(ancestor.names.size) == ancestor.names
 
     private enum class CreateType { Folder, Note }
+
+    private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
 
     private companion object {
         const val STATE_FOLDER = "current_folder"

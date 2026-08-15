@@ -10,9 +10,9 @@
         android:id="@+id/library_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/toolbar_background"
-        app:navigationIconTint="@color/text_primary"
-        app:titleTextColor="@color/text_primary">
+        android:background="?attr/inkNoteToolbarBackground"
+        app:navigationIconTint="?attr/inkNoteTextPrimary"
+        app:titleTextColor="?attr/inkNoteTextPrimary">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -22,6 +22,16 @@
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/appearance"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/appearance"
+                android:padding="12dp"
+                android:src="@drawable/ic_palette_24"
+                app:tint="?attr/inkNoteTextPrimary" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/create_folder"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
@@ -29,7 +39,7 @@
                 android:contentDescription="@string/create_folder"
                 android:padding="12dp"
                 android:src="@drawable/ic_create_folder_24"
-                app:tint="@color/text_primary" />
+                app:tint="?attr/inkNoteTextPrimary" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/create_note"
@@ -39,7 +49,7 @@
                 android:contentDescription="@string/create_note"
                 android:padding="12dp"
                 android:src="@drawable/ic_note_add_24"
-                app:tint="@color/text_primary" />
+                app:tint="?attr/inkNoteTextPrimary" />
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 
@@ -57,7 +67,7 @@
             android:paddingBottom="24dp"
             android:scrollbars="vertical" />
 
-        <TextView
+        <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/empty_library"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -65,8 +75,10 @@
             android:drawablePadding="12dp"
             android:gravity="center"
             android:text="@string/empty_library"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp" />
+            android:textColor="?attr/inkNoteTextSecondary"
+            android:textSize="16sp"
+            app:drawableTint="?attr/inkNoteTextSecondary"
+            app:drawableTopCompat="@drawable/ic_note_24" />
     </FrameLayout>
 
 </LinearLayout>

@@ -29,7 +29,6 @@
     <string name="note_title_hint">标题</string>
     <string name="create">创建</string>
     <string name="create_failed">创建失败</string>
-    <string name="folder">文件夹</string>
     <string name="empty_library">这里还没有笔记\n使用右上角按钮创建文件夹或笔记</string>
     <string name="entry_actions">项目操作</string>
     <string name="rename_note">重命名笔记</string>
@@ -55,4 +54,30 @@
     <string name="folder_deleted">文件夹已删除</string>
     <string name="open_failed">无法打开：%1$s</string>
     <string name="unknown_error">未知错误</string>
+    <string name="appearance">外观与布局</string>
+    <string name="theme_setting">主题</string>
+    <string name="library_layout_setting">主页样式</string>
+    <string name="note_preview_setting">笔记预览</string>
+    <string name="theme_inknote">InkNote</string>
+    <string name="theme_catppuccin">Catppuccin</string>
+    <string name="theme_tokyo_night">Tokyo Night</string>
+    <string name="theme_minimal">Obsidian Minimal 风格</string>
+    <string name="layout_samsung">Samsung 风格（文件夹置顶）</string>
+    <string name="layout_list">紧凑列表</string>
+    <string name="layout_grid">缩略图网格</string>
+    <string name="preview_thumbnail">首页图片与摘要</string>
+    <string name="preview_title_only">仅显示标题</string>
+    <string name="folders_section">文件夹</string>
+    <string name="notes_section">笔记</string>
+    <string name="folder_color">文件夹颜色</string>
+    <string name="folder_color_blue">蓝色</string>
+    <string name="folder_color_purple">紫色</string>
+    <string name="folder_color_pink">粉色</string>
+    <string name="folder_color_orange">橙色</string>
+    <string name="folder_color_green">绿色</string>
+    <string name="folder_color_gray">灰色</string>
+    <plurals name="folder_item_count">
+        <item quantity="one">%1$d 个项目</item>
+        <item quantity="other">%1$d 个项目</item>
+    </plurals>
 </resources>

@@ -303,4 +303,33 @@ class NoteLibraryTest {
             library.listFolderLocations().map { it.displayPath }
         )
     }
+
+    @Test fun persistsFolderColorAcrossRenameAndMove() {
+        val (_, library) = library()
+        val folder = library.createFolder(rootLocation, "Project")
+        library.setFolderColor(rootLocation, folder.name, FolderColor.Purple)
+        val renamed = library.renameFolder(rootLocation, folder.name, "Renamed")
+        val destination = library.createFolder(rootLocation, "Archive")
+        val moved = library.moveFolder(rootLocation, renamed.name, rootLocation.child(destination.name))
+
+        assertEquals(FolderColor.Purple, moved.folderColor)
+        assertEquals(
+            FolderColor.Purple,
+            library.findFolder(rootLocation.child(destination.name), moved.name).folderColor
+        )
+    }
+
+    @Test fun exposesBoundedNotePreviewAndExistingFirstImage() {
+        val (root, library) = library()
+        val note = library.createNote(rootLocation, "Travel")
+        File(root, "${note.relativePath}/assets/cover.jpg").writeText("image")
+        File(root, "${note.relativePath}/note.md").writeText(
+            "# Summer\n![[asset:assets/cover.jpg|Cover]]\nMemories"
+        )
+
+        val listed = library.list(rootLocation).single()
+
+        assertEquals("Summer Memories", listed.preview.excerpt)
+        assertEquals("cover.jpg", listed.previewImage?.name)
+    }
 }

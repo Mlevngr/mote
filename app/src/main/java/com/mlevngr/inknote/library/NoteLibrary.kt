@@ -1,6 +1,7 @@
 package com.mlevngr.inknote.library
 
 import android.content.Context
+import com.mlevngr.inknote.assets.AssetPathPolicy
 import java.io.File
 
 class NoteLibrary internal constructor(private val root: File) {
@@ -29,7 +30,11 @@ class NoteLibrary internal constructor(private val root: File) {
         val name: String,
         val relativePath: String,
         val type: EntryType,
-        val modifiedAt: Long
+        val modifiedAt: Long,
+        val childCount: Int = 0,
+        val folderColor: FolderColor = FolderColor.Blue,
+        val preview: NotePreview = NotePreview("", null),
+        val previewImage: File? = null
     )
 
     fun list(location: FolderLocation): List<Entry> = requireFolder(location)
@@ -135,6 +140,12 @@ class NoteLibrary internal constructor(private val root: File) {
     fun renameFolder(location: FolderLocation, folderName: String, requestedName: String): Entry =
         folderEntry(renameChild(location, folderName, requestedName, EntryType.Folder))
 
+    fun setFolderColor(location: FolderLocation, folderName: String, color: FolderColor): Entry {
+        val folder = findChild(location, folderName, EntryType.Folder)
+        File(folder, FOLDER_COLOR_FILE).writeText(color.id)
+        return folderEntry(folder)
+    }
+
     private fun requireFolder(location: FolderLocation): File {
         var current = root
         location.names.forEach { name ->
@@ -214,14 +225,35 @@ class NoteLibrary internal constructor(private val root: File) {
         return name.take(MAX_NAME_LENGTH)
     }
 
-    private fun entry(directory: File, type: EntryType): Entry = Entry(
-        name = displayName(directory, type),
-        relativePath = directory.relativeTo(root).invariantSeparatorsPath,
-        type = type,
-        modifiedAt = if (type == EntryType.Note) {
-            File(directory, NOTE_FILE).lastModified()
-        } else directory.lastModified()
-    )
+    private fun entry(directory: File, type: EntryType): Entry {
+        val preview = if (type == EntryType.Note) {
+            runCatching {
+                File(directory, NOTE_FILE).bufferedReader().use { reader ->
+                    val buffer = CharArray(MAX_PREVIEW_SOURCE_LENGTH)
+                    val length = reader.read(buffer).coerceAtLeast(0)
+                    NotePreviewExtractor.extract(buffer.concatToString(0, length))
+                }
+            }.getOrDefault(NotePreview("", null))
+        } else NotePreview("", null)
+        return Entry(
+            name = displayName(directory, type),
+            relativePath = directory.relativeTo(root).invariantSeparatorsPath,
+            type = type,
+            modifiedAt = if (type == EntryType.Note) {
+                File(directory, NOTE_FILE).lastModified()
+            } else directory.lastModified(),
+            childCount = if (type == EntryType.Folder) {
+                directory.listFiles().orEmpty().count { it.isDirectory && !it.name.startsWith('.') }
+            } else 0,
+            folderColor = if (type == EntryType.Folder) {
+                FolderColor.fromId(runCatching { File(directory, FOLDER_COLOR_FILE).readText().trim() }.getOrNull())
+            } else FolderColor.Blue,
+            preview = preview,
+            previewImage = preview.imageRelativePath?.let { relative ->
+                AssetPathPolicy.resolve(directory, relative)?.takeIf(File::isFile)
+            }
+        )
+    }
 
     private fun noteEntry(directory: File): Entry = entry(directory, EntryType.Note)
     private fun folderEntry(directory: File): Entry = entry(directory, EntryType.Folder)
@@ -250,8 +282,10 @@ class NoteLibrary internal constructor(private val root: File) {
         const val NOTE_FILE = "note.md"
         const val ASSETS_DIRECTORY = "assets"
         const val BODY_SEPARATION_MARKER = ".body-title-separated-v1"
+        private const val FOLDER_COLOR_FILE = ".inknote-folder-color"
         private const val NOTE_DIRECTORY_SUFFIX = ".note"
         private const val FOLDER_DIRECTORY_SUFFIX = ".folder"
         private const val MAX_NAME_LENGTH = 80
+        private const val MAX_PREVIEW_SOURCE_LENGTH = 32_768
     }
 }
