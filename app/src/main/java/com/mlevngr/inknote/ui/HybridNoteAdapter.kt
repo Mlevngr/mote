@@ -47,7 +47,8 @@ class HybridNoteAdapter(
     private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean,
     private val onAssetActions: (Int, File, String) -> Unit,
-    private val onPasteAt: (Int) -> Unit,
+    private val onPasteAt: (Int?) -> Unit,
+    private val onAppendAtEnd: () -> Unit,
     private val onBackFromIme: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
@@ -90,16 +91,19 @@ class HybridNoteAdapter(
 
     fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
 
-    override fun getItemCount(): Int = rows.size
+    override fun getItemCount(): Int = rows.size + 1
 
-    override fun getItemViewType(position: Int): Int = when (val row = rows[position]) {
-        is HybridRow.Editor -> TYPE_EDITOR
-        is HybridRow.Rendered -> when (row.preview) {
-            is PreviewRow.Markdown -> TYPE_MARKDOWN
-            is PreviewRow.Image -> TYPE_IMAGE
-            is PreviewRow.PdfPage -> TYPE_PDF
-            is PreviewRow.Attachment -> TYPE_ATTACHMENT
-            is PreviewRow.Error -> TYPE_ERROR
+    override fun getItemViewType(position: Int): Int {
+        if (position == rows.size) return TYPE_END_ZONE
+        return when (val row = rows[position]) {
+            is HybridRow.Editor -> TYPE_EDITOR
+            is HybridRow.Rendered -> when (row.preview) {
+                is PreviewRow.Markdown -> TYPE_MARKDOWN
+                is PreviewRow.Image -> TYPE_IMAGE
+                is PreviewRow.PdfPage -> TYPE_PDF
+                is PreviewRow.Attachment -> TYPE_ATTACHMENT
+                is PreviewRow.Error -> TYPE_ERROR
+            }
         }
     }
 
@@ -136,6 +140,19 @@ class HybridNoteAdapter(
                 gravity = Gravity.CENTER_VERTICAL
                 textSize = 17f
             })
+            TYPE_END_ZONE -> TextHolder(TextView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(horizontalPadding, dp(24), horizontalPadding, dp(40))
+                minHeight = dp(112)
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                textSize = 13f
+                setTextColor(context.getColor(R.color.text_secondary))
+                text = context.getString(R.string.document_end_hint)
+                contentDescription = context.getString(R.string.document_end_hint)
+            })
             else -> AssetHolder(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -148,6 +165,10 @@ class HybridNoteAdapter(
         }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (position == rows.size) {
+            bindEndZone(holder as TextHolder)
+            return
+        }
         when (val row = rows[position]) {
             is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
             is HybridRow.Rendered -> {
@@ -215,6 +236,17 @@ class HybridNoteAdapter(
                     }
                 }
             }
+        }
+    }
+
+    private fun bindEndZone(holder: TextHolder) {
+        val gate = DoubleTapGate(ViewConfiguration.getDoubleTapTimeout().toLong())
+        holder.text.setOnClickListener {
+            if (gate.registerTap(SystemClock.uptimeMillis())) onAppendAtEnd()
+        }
+        holder.text.setOnLongClickListener {
+            onPasteAt(null)
+            true
         }
     }
 
@@ -525,5 +557,6 @@ class HybridNoteAdapter(
         const val TYPE_PDF = 3
         const val TYPE_ERROR = 4
         const val TYPE_ATTACHMENT = 5
+        const val TYPE_END_ZONE = 6
     }
 }

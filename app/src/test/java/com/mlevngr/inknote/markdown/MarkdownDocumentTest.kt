@@ -87,6 +87,20 @@ class MarkdownDocumentTest {
         assertEquals(listOf("Before", "Asset", "After"), document.snapshot())
     }
 
+    @Test fun movesALineToTheDocumentEnd() {
+        val document = MarkdownDocument.parse("Before\nAsset\nAfter")
+
+        assertEquals(2, document.moveLineToPasteTarget(1, null))
+        assertEquals(listOf("Before", "After", "Asset"), document.snapshot())
+    }
+
+    @Test fun movingTheLastLineToTheEndNeverDuplicatesIt() {
+        val document = MarkdownDocument.parse("Before\nAfter\nAsset")
+
+        assertEquals(2, document.moveLineToPasteTarget(2, null))
+        assertEquals(listOf("Before", "After", "Asset"), document.snapshot())
+    }
+
     @Test fun removingTheOnlyLineLeavesAnEditableEmptyBody() {
         val document = MarkdownDocument.parse("Only line")
         document.removeLine(0)

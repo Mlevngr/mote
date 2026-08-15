@@ -106,6 +106,7 @@ class EditorActivity : AppCompatActivity() {
             onMergeWithPrevious = ::mergeWithPrevious,
             onAssetActions = ::showAssetActions,
             onPasteAt = ::showPasteAt,
+            onAppendAtEnd = ::appendLineAtEnd,
             onBackFromIme = ::handleBackNavigation
         )
 
@@ -142,7 +143,7 @@ class EditorActivity : AppCompatActivity() {
             adapter = noteAdapter
             itemAnimator = null
             setOnLongClickListener {
-                showPasteAt(document.size - 1)
+                showPasteAt(null)
                 true
             }
         }
@@ -304,6 +305,17 @@ class EditorActivity : AppCompatActivity() {
         scheduleSave()
     }
 
+    private fun appendLineAtEnd() {
+        val lastLine = document.size - 1
+        val target = if (document[lastLine].isBlank()) {
+            lastLine
+        } else {
+            document.insertAfter(lastLine, "")
+        }
+        enterEditModeAt(target)
+        scheduleSave()
+    }
+
     private fun refreshRows(requestFocus: Boolean = false, cursorPosition: Int? = null) {
         val revision = renderRevision.incrementAndGet()
         val lines = document.snapshot()
@@ -412,7 +424,7 @@ class EditorActivity : AppCompatActivity() {
         ).show()
     }
 
-    private fun showPasteAt(targetLine: Int) {
+    private fun showPasteAt(targetLine: Int?) {
         val clipboardText = clipboardText()
         if (pendingAssetTransfer == null && clipboardText.isNullOrEmpty()) {
             Toast.makeText(this, R.string.nothing_to_paste, Toast.LENGTH_SHORT).show()
@@ -425,13 +437,13 @@ class EditorActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun pasteAt(targetLine: Int, clipboardText: String?) {
+    private fun pasteAt(targetLine: Int?, clipboardText: String?) {
         val stagedTransfer = pendingAssetTransfer
         val transfer = stagedTransfer?.takeIf { pending ->
             pending.move || clipboardText == null || clipboardText == pending.source
         }
         if (stagedTransfer != null && transfer == null) pendingAssetTransfer = null
-        val target = targetLine.coerceIn(0, document.size - 1)
+        val target = targetLine?.coerceIn(0, document.size - 1)
         if (transfer?.move == true) {
             val currentSource = locateTransferSource(transfer)
             if (currentSource < 0) {
@@ -440,7 +452,9 @@ class EditorActivity : AppCompatActivity() {
                     .show()
                 return
             }
-            val replacesBlank = target != currentSource && document[target].isBlank()
+            val replacesBlank = target != null &&
+                target != currentSource &&
+                document[target].isBlank()
             val destination = document.moveLineToPasteTarget(currentSource, target)
             activeLine = remapLineAfterMove(
                 activeLine,

@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.6.3 APK](https://github.com/Mlevngr/note/releases/download/v0.6.3/InkNote-0.6.3.apk)**
+**[直接下载 InkNote 0.6.4 APK](https://github.com/Mlevngr/note/releases/download/v0.6.4/InkNote-0.6.4.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -68,6 +68,7 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 图片和 PDF 的标题栏可点击展开或收起；PDF 会整份折叠，不用逐页操作。
 - 长按图片、PDF 或附件会打开上下文操作：移动、复制、删除；图片和 PDF 标题栏同时提供可访问的三点入口。
 - 选择移动或复制后，在空白行或正文末尾长按即可粘贴；移动使用应用内部状态完成原子删除与插入，不会因系统剪贴板变化而降级为复制。
+- 文档末尾始终保留可操作的尾部空白区，即使最后一项是图片或 PDF，也能继续向下滚动并在文末移动/粘贴；双击该区域会创建新的正文行。
 - 删除仍会二次确认；只有在没有其他引用时才删除对应的内部文件。
 - 其他文件显示为附件卡片。
 - 所有文件都会复制到当前笔记的私有 `assets/` 目录；笔记不会依赖原文件 URI，也不会创建可点击的外部链接。
