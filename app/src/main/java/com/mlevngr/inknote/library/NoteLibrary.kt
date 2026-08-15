@@ -87,9 +87,8 @@ class NoteLibrary internal constructor(private val root: File) {
         collect(root)
     }.sortedBy { it.relativePath.lowercase() }
 
-    fun moveNote(notePath: String, targetFolderPath: String): Entry {
-        val source = NotePathPolicy.resolve(root, notePath) ?: error("无效的笔记路径")
-        require(source.isDirectory && File(source, NOTE_FILE).isFile) { "笔记不存在" }
+    fun moveNote(sourceFolderPath: String, noteName: String, targetFolderPath: String): Entry {
+        val source = findChild(sourceFolderPath, noteName, EntryType.Note)
         val targetFolder = requireFolder(targetFolderPath)
         if (source.parentFile?.canonicalFile == targetFolder.canonicalFile) {
             return noteEntry(source)
@@ -111,6 +110,12 @@ class NoteLibrary internal constructor(private val root: File) {
     fun findFolder(parentPath: String, folderName: String): Entry =
         folderEntry(findChild(parentPath, folderName, EntryType.Folder))
 
+    fun findNote(parentPath: String, noteName: String): Entry =
+        noteEntry(findChild(parentPath, noteName, EntryType.Note))
+
+    internal fun findNoteDirectory(parentPath: String, noteName: String): File =
+        findChild(parentPath, noteName, EntryType.Note)
+
     fun deleteFolder(parentPath: String, folderName: String) {
         val folder = findChild(parentPath, folderName, EntryType.Folder)
         check(folder.deleteRecursively() && !folder.exists()) { "无法删除文件夹" }
@@ -129,17 +134,6 @@ class NoteLibrary internal constructor(private val root: File) {
         }.toList().asReversed().joinToString(" / ") {
             displayName(it, EntryType.Folder)
         }
-    }
-
-    fun displayNameForNote(notePath: String): String {
-        val note = NotePathPolicy.resolve(root, notePath) ?: return notePath.substringAfterLast('/')
-        return displayName(note, EntryType.Note)
-    }
-
-    fun requireNote(notePath: String): File {
-        val note = NotePathPolicy.resolve(root, notePath) ?: error("无效的笔记路径")
-        require(note.isDirectory && File(note, NOTE_FILE).isFile) { "笔记不存在" }
-        return note
     }
 
     private fun requireFolder(folderPath: String): File {

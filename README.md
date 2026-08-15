@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.5.4 APK](https://github.com/Mlevngr/note/releases/download/v0.5.4/InkNote-0.5.4.apk)**
+**[直接下载 InkNote 0.5.5 APK](https://github.com/Mlevngr/note/releases/download/v0.5.5/InkNote-0.5.5.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 

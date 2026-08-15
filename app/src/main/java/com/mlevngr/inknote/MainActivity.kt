@@ -98,8 +98,8 @@ class MainActivity : AppCompatActivity() {
                     refresh()
                 }
                 NoteLibrary.EntryType.Note -> {
-                    library.requireNote(entry.relativePath)
-                    startActivity(EditorActivity.intent(this, entry.relativePath))
+                    val note = library.findNote(currentFolder, entry.name)
+                    startActivity(EditorActivity.intent(this, currentFolder, note.name))
                 }
             }
         }.onFailure {
@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.move_to)
             .setItems(labels) { _, which ->
                 val target = destinations[which].orEmpty()
-                runCatching { library.moveNote(note.relativePath, target) }
+                runCatching { library.moveNote(currentFolder, note.name, target) }
                     .onSuccess {
                         refresh()
                         Toast.makeText(this, getString(R.string.note_moved), Toast.LENGTH_SHORT).show()

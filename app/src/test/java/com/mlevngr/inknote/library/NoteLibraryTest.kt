@@ -53,7 +53,7 @@ class NoteLibraryTest {
         File(root, "Travel.note/assets/photo.jpg").writeText("image")
         val folder = library.createFolder("", "Archive")
 
-        val moved = library.moveNote(note.relativePath, folder.relativePath)
+        val moved = library.moveNote("", note.name, folder.relativePath)
 
         assertEquals("Archive.folder/Travel.note", moved.relativePath)
         assertTrue(File(root, "Archive.folder/Travel.note/note.md").isFile)
@@ -67,7 +67,7 @@ class NoteLibraryTest {
         val archive = library.createFolder("", "Archive")
         library.createNote(archive.relativePath, "Plan")
 
-        val moved = library.moveNote(source.relativePath, archive.relativePath)
+        val moved = library.moveNote("", source.name, archive.relativePath)
 
         assertEquals("Archive.folder/Plan (1).note", moved.relativePath)
         assertEquals(listOf("Plan", "Plan (1)"), library.list(archive.relativePath).map { it.name })
@@ -100,8 +100,8 @@ class NoteLibraryTest {
             library.list("").map { it.name }
         )
         assertEquals("Legacy Folder", library.displayPath("Legacy Folder"))
-        assertEquals("Legacy Note", library.displayNameForNote("Legacy Note"))
-        assertTrue(library.requireNote("Legacy Note").isDirectory)
+        assertEquals("Legacy Note", library.findNote("", "Legacy Note").name)
+        assertTrue(library.findNoteDirectory("", "Legacy Note").isDirectory)
     }
 
     @Test fun displaysNestedTypedFolderPathsWithoutStorageSuffixes() {
@@ -121,6 +121,20 @@ class NoteLibraryTest {
 
         assertEquals(created.relativePath, opened.relativePath)
         assertEquals(listOf("索引"), library.list(opened.relativePath).map { it.name })
+    }
+
+    @Test fun findsRootAndNestedNotesWithoutReparsingTheirRelativePaths() {
+        val (_, library) = library()
+        val rootNote = library.createNote("", "根笔记")
+        val folder = library.createFolder("", "资料")
+        val nestedNote = library.createNote(folder.relativePath, "子笔记")
+
+        assertEquals(rootNote.name, library.findNote("", rootNote.name).name)
+        assertEquals(
+            nestedNote.relativePath,
+            library.findNote(folder.relativePath, nestedNote.name).relativePath
+        )
+        assertTrue(library.findNoteDirectory(folder.relativePath, nestedNote.name).isDirectory)
     }
 
     @Test fun deletesTheWholeNoteIncludingAssets() {

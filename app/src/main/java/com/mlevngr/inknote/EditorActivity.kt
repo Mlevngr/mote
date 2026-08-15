@@ -16,7 +16,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.mlevngr.inknote.assets.NoteWorkspace
-import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
@@ -49,14 +48,17 @@ class EditorActivity : AppCompatActivity() {
         setContentView(R.layout.activity_editor)
         SystemBarInsets.install(findViewById(R.id.app_root))
 
-        val notePath = intent.getStringExtra(EXTRA_NOTE_PATH)
+        val noteName = intent.getStringExtra(EXTRA_NOTE_NAME)
             ?.takeIf(String::isNotBlank)
             ?: run {
                 finish()
                 return
             }
+        val folderPath = intent.getStringExtra(EXTRA_FOLDER_PATH).orEmpty()
         val initialState = runCatching {
-            NoteWorkspace(this, notePath).let { it to MarkdownDocument.parse(it.load(DEFAULT_NOTE)) }
+            NoteWorkspace(this, folderPath, noteName).let {
+                it to MarkdownDocument.parse(it.load(DEFAULT_NOTE))
+            }
         }.getOrElse {
             Toast.makeText(
                 this,
@@ -80,7 +82,7 @@ class EditorActivity : AppCompatActivity() {
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
-            title = NoteLibrary(this@EditorActivity).displayNameForNote(notePath)
+            title = noteName
             setNavigationIcon(R.drawable.ic_arrow_back_24)
             navigationContentDescription = getString(R.string.back_to_library)
             setNavigationOnClickListener { finish() }
@@ -258,10 +260,13 @@ class EditorActivity : AppCompatActivity() {
 
     companion object {
         private const val SAVE_DELAY_MS = 350L
-        private const val EXTRA_NOTE_PATH = "note_path"
+        private const val EXTRA_FOLDER_PATH = "folder_path"
+        private const val EXTRA_NOTE_NAME = "note_name"
 
-        fun intent(context: android.content.Context, notePath: String): Intent =
-            Intent(context, EditorActivity::class.java).putExtra(EXTRA_NOTE_PATH, notePath)
+        fun intent(context: android.content.Context, folderPath: String, noteName: String): Intent =
+            Intent(context, EditorActivity::class.java)
+                .putExtra(EXTRA_FOLDER_PATH, folderPath)
+                .putExtra(EXTRA_NOTE_NAME, noteName)
 
         val DEFAULT_NOTE = """
             # InkNote
