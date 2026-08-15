@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
 
         library = NoteLibrary(this)
         currentFolder = savedInstanceState?.getString(STATE_FOLDER).orEmpty()
-        adapter = NoteLibraryAdapter(this, ::openEntry, ::showNoteActions)
+        adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
         emptyView = findViewById(R.id.empty_library)
         findViewById<RecyclerView>(R.id.library_list).apply {
@@ -94,8 +94,7 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             when (entry.type) {
                 NoteLibrary.EntryType.Folder -> {
-                    library.list(entry.relativePath)
-                    currentFolder = entry.relativePath
+                    currentFolder = library.findFolder(currentFolder, entry.name).relativePath
                     refresh()
                 }
                 NoteLibrary.EntryType.Note -> {
@@ -167,21 +166,27 @@ class MainActivity : AppCompatActivity() {
         input.requestFocus()
     }
 
-    private fun showNoteActions(entry: NoteLibrary.Entry) {
-        if (entry.type != NoteLibrary.EntryType.Note) return
-        val actions = arrayOf(getString(R.string.move_note), getString(R.string.delete_note))
+    private fun showEntryActions(entry: NoteLibrary.Entry) {
+        val actions = if (entry.type == NoteLibrary.EntryType.Note) {
+            arrayOf(getString(R.string.move_note), getString(R.string.delete_note))
+        } else {
+            arrayOf(getString(R.string.delete_folder))
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle(entry.name)
             .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> showMoveDialog(entry)
-                    1 -> showDeleteConfirmation(entry)
+                when (entry.type) {
+                    NoteLibrary.EntryType.Note -> when (which) {
+                        0 -> showMoveDialog(entry)
+                        1 -> showDeleteNoteConfirmation(entry)
+                    }
+                    NoteLibrary.EntryType.Folder -> showDeleteFolderConfirmation(entry)
                 }
             }
             .show()
     }
 
-    private fun showDeleteConfirmation(note: NoteLibrary.Entry) {
+    private fun showDeleteNoteConfirmation(note: NoteLibrary.Entry) {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.delete_note)
             .setMessage(getString(R.string.delete_note_confirmation, note.name))
@@ -191,6 +196,28 @@ class MainActivity : AppCompatActivity() {
                     .onSuccess {
                         refresh()
                         Toast.makeText(this, R.string.note_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        Toast.makeText(
+                            this,
+                            it.message ?: getString(R.string.delete_failed),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+            .show()
+    }
+
+    private fun showDeleteFolderConfirmation(folder: NoteLibrary.Entry) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_folder)
+            .setMessage(getString(R.string.delete_folder_confirmation, folder.name))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                runCatching { library.deleteFolder(currentFolder, folder.name) }
+                    .onSuccess {
+                        refresh()
+                        Toast.makeText(this, R.string.folder_deleted, Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
                         Toast.makeText(

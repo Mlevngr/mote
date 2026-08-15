@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.5.3 APK](https://github.com/Mlevngr/note/releases/download/v0.5.3/InkNote-0.5.3.apk)**
+**[直接下载 InkNote 0.5.4 APK](https://github.com/Mlevngr/note/releases/download/v0.5.4/InkNote-0.5.4.apk)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -46,6 +46,7 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 笔记与文件夹可以使用相同显示名称；同类型重名会从 `名称 (1)` 开始编号，不会覆盖已有内容。
 - 点击笔记右侧的更多按钮或长按笔记，可以选择目标文件夹移动笔记；Markdown 与 assets 会整体移动。
 - 笔记操作菜单支持删除；确认后会删除笔记及其内部附件，避免误触直接丢失数据。
+- 文件夹也提供长按和三点操作菜单；删除非空文件夹前会明确提示其内部笔记与附件将一并删除。
 - 新建文件夹和笔记使用 Material 轮廓输入框，标签、边框与输入文字互不重叠。
 - 旧版本的 `welcome` 笔记会自动出现在根目录，不迁移、不删除原数据。
 - 目录路径经过规范化检查，不能通过名称越过笔记库目录。

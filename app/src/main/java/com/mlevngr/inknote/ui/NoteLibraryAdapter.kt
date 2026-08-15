@@ -60,14 +60,9 @@ class NoteLibraryAdapter(
         }
         holder.itemView.setOnClickListener { onClick(entry) }
         holder.itemView.setOnLongClickListener {
-            if (entry.type == NoteLibrary.EntryType.Note) {
-                onMenu(entry)
-                true
-            } else false
+            onMenu(entry)
+            true
         }
-        holder.menu.visibility = if (entry.type == NoteLibrary.EntryType.Note) {
-            android.view.View.VISIBLE
-        } else android.view.View.INVISIBLE
         holder.menu.setOnClickListener { onMenu(entry) }
     }
 
@@ -103,7 +98,7 @@ class NoteLibraryAdapter(
             background = TypedValue().also {
                 context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, it, true)
             }.let { AppCompatResources.getDrawable(context, it.resourceId) }
-            contentDescription = context.getString(R.string.note_actions)
+            contentDescription = context.getString(R.string.entry_actions)
             container.addView(this, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
     }

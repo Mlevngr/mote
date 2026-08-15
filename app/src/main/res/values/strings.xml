@@ -15,7 +15,7 @@
     <string name="create_failed">创建失败</string>
     <string name="folder">文件夹</string>
     <string name="empty_library">这里还没有笔记\n使用右上角按钮创建文件夹或笔记</string>
-    <string name="note_actions">笔记操作</string>
+    <string name="entry_actions">项目操作</string>
     <string name="move_note">移动笔记</string>
     <string name="move_to">移动到</string>
     <string name="library_root">笔记库根目录</string>
@@ -26,6 +26,9 @@
     <string name="delete">删除</string>
     <string name="note_deleted">笔记已删除</string>
     <string name="delete_failed">删除失败</string>
+    <string name="delete_folder">删除文件夹</string>
+    <string name="delete_folder_confirmation">确定永久删除“%1$s”以及其中的所有笔记和附件吗？此操作无法撤销。</string>
+    <string name="folder_deleted">文件夹已删除</string>
     <string name="open_failed">无法打开：%1$s</string>
     <string name="unknown_error">未知错误</string>
 </resources>

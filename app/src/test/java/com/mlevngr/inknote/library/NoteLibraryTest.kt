@@ -1,6 +1,7 @@
 package com.mlevngr.inknote.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -111,6 +112,17 @@ class NoteLibraryTest {
         assertEquals("Work / Ideas", library.displayPath(child.relativePath))
     }
 
+    @Test fun findsAndOpensChineseNamedFolderFromCurrentDirectory() {
+        val (_, library) = library()
+        val created = library.createFolder("", "资料")
+        library.createNote(created.relativePath, "索引")
+
+        val opened = library.findFolder("", "资料")
+
+        assertEquals(created.relativePath, opened.relativePath)
+        assertEquals(listOf("索引"), library.list(opened.relativePath).map { it.name })
+    }
+
     @Test fun deletesTheWholeNoteIncludingAssets() {
         val (root, library) = library()
         val note = library.createNote("", "Disposable")
@@ -150,5 +162,32 @@ class NoteLibraryTest {
 
         assertTrue(!File(root, "工作.folder/会议记录.note").exists())
         assertTrue(library.list(folder.relativePath).isEmpty())
+    }
+
+    @Test fun deletesNonEmptyFolderButKeepsSameNamedNote() {
+        val (root, library) = library()
+        val folder = library.createFolder("", "Project")
+        val rootNote = library.createNote("", "Project")
+        val nestedNote = library.createNote(folder.relativePath, "Nested")
+        File(root, "${nestedNote.relativePath}/assets/photo.jpg").writeText("image")
+
+        library.deleteFolder("", folder.name)
+
+        assertTrue(!File(root, folder.relativePath).exists())
+        assertTrue(File(root, "${rootNote.relativePath}/note.md").isFile)
+        assertEquals(listOf(NoteLibrary.EntryType.Note), library.list("").map { it.type })
+    }
+
+    @Test fun pathPolicyAcceptsChildrenAndRejectsTraversalAndLookalikes() {
+        val (root, _) = library()
+        File(root, "Child.folder").mkdirs()
+        val lookalike = File(root.parentFile, "${root.name}-other").also(File::mkdirs)
+
+        assertEquals(
+            File(root, "Child.folder").canonicalFile,
+            NotePathPolicy.resolve(root, "Child.folder")
+        )
+        assertNull(NotePathPolicy.resolve(root, "../${lookalike.name}"))
+        assertNull(NotePathPolicy.resolve(root, lookalike.absolutePath))
     }
 }

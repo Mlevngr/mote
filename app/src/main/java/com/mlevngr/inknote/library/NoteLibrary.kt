@@ -104,15 +104,16 @@ class NoteLibrary internal constructor(private val root: File) {
     }
 
     fun deleteNote(folderPath: String, noteName: String) {
-        val folder = requireFolder(folderPath)
-        val matches = folder.listFiles().orEmpty().filter { child ->
-            child.isDirectory &&
-                File(child, NOTE_FILE).isFile &&
-                displayName(child, EntryType.Note) == noteName
-        }
-        require(matches.size == 1) { "笔记不存在或已经移动" }
-        val note = matches.single()
+        val note = findChild(folderPath, noteName, EntryType.Note)
         check(note.deleteRecursively() && !note.exists()) { "无法删除笔记" }
+    }
+
+    fun findFolder(parentPath: String, folderName: String): Entry =
+        folderEntry(findChild(parentPath, folderName, EntryType.Folder))
+
+    fun deleteFolder(parentPath: String, folderName: String) {
+        val folder = findChild(parentPath, folderName, EntryType.Folder)
+        check(folder.deleteRecursively() && !folder.exists()) { "无法删除文件夹" }
     }
 
     fun parentOf(folderPath: String): String? {
@@ -167,6 +168,19 @@ class NoteLibrary internal constructor(private val root: File) {
         return File(parent, "$displayName$marker")
     }
 
+    private fun findChild(parentPath: String, childName: String, type: EntryType): File {
+        val parent = requireFolder(parentPath)
+        val matches = parent.listFiles().orEmpty().filter { child ->
+            if (!child.isDirectory) return@filter false
+            val childType = if (File(child, NOTE_FILE).isFile) EntryType.Note else EntryType.Folder
+            childType == type && displayName(child, childType) == childName
+        }
+        require(matches.size == 1) {
+            if (type == EntryType.Note) "笔记不存在或已经移动" else "文件夹不存在或已经移动"
+        }
+        return matches.single()
+    }
+
     private fun normalizedName(requestedName: String, stripMarkdownExtension: Boolean): String {
         var name = requestedName.trim()
         if (stripMarkdownExtension && name.endsWith(".md", ignoreCase = true)) {
@@ -186,6 +200,13 @@ class NoteLibrary internal constructor(private val root: File) {
         relativePath = relativePath(directory),
         type = EntryType.Note,
         modifiedAt = File(directory, NOTE_FILE).lastModified()
+    )
+
+    private fun folderEntry(directory: File): Entry = Entry(
+        name = displayName(directory, EntryType.Folder),
+        relativePath = relativePath(directory),
+        type = EntryType.Folder,
+        modifiedAt = directory.lastModified()
     )
 
     private fun displayName(directory: File, type: EntryType): String {
@@ -208,8 +229,8 @@ internal object NotePathPolicy {
         val canonicalRoot = runCatching { root.canonicalFile }.getOrNull() ?: return null
         val candidate = runCatching { File(canonicalRoot, relativePath).canonicalFile }.getOrNull()
             ?: return null
-        return candidate.takeIf {
-            it == canonicalRoot || it.toPath().startsWith(canonicalRoot.toPath())
-        }
+        val rootPath = canonicalRoot.path
+        val childPrefix = if (rootPath.endsWith(File.separator)) rootPath else "$rootPath${File.separator}"
+        return candidate.takeIf { it.path == rootPath || it.path.startsWith(childPrefix) }
     }
 }
