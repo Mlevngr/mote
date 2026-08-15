@@ -10,6 +10,7 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.LruCache
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -21,6 +22,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.getSystemService
 import androidx.core.view.setPadding
 import androidx.recyclerview.widget.RecyclerView
@@ -43,7 +45,8 @@ class HybridNoteAdapter(
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean,
-    private val onDeleteAsset: (Int, File) -> Unit
+    private val onAssetActions: (Int, File, String) -> Unit,
+    private val onPasteAt: (Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
@@ -150,19 +153,30 @@ class HybridNoteAdapter(
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
-                        holder.text.setTextIsSelectable(!editing)
+                        val blank = preview.source == "\u00a0"
+                        holder.text.setTextIsSelectable(!editing && !blank)
                         holder.text.setOnClickListener(if (editing) {
                             { onActivate(row.lineIndex) }
                         } else null)
-                        holder.text.setOnLongClickListener(null)
-                        holder.itemView.setOnLongClickListener(null)
+                        val pasteListener = if (blank) {
+                            View.OnLongClickListener { onPasteAt(row.lineIndex); true }
+                        } else null
+                        holder.text.setOnLongClickListener(pasteListener)
+                        holder.itemView.setOnLongClickListener(pasteListener)
                         holder.text.setTextColor(context.getColor(R.color.text_primary))
                         markwon.setMarkdown(holder.text, preview.source)
                     }
                     is PreviewRow.Attachment -> {
                         holder as TextHolder
                         holder.text.setTextIsSelectable(false)
-                        bindAssetDeletion(holder.itemView, holder.text, row.lineIndex, preview.file)
+                        bindAssetActions(
+                            holder.itemView,
+                            holder.text,
+                            null,
+                            row.lineIndex,
+                            preview.file,
+                            preview.label
+                        )
                         holder.text.setTextColor(context.getColor(R.color.primary))
                         holder.text.text = "📎  ${preview.label}  •  ${formatSize(preview.file.length())}"
                     }
@@ -178,12 +192,26 @@ class HybridNoteAdapter(
                     }
                     is PreviewRow.Image -> {
                         holder as AssetHolder
-                        bindAssetDeletion(holder.itemView, holder.caption, row.lineIndex, preview.file)
+                        bindAssetActions(
+                            holder.itemView,
+                            holder.caption,
+                            holder.menu,
+                            row.lineIndex,
+                            preview.file,
+                            preview.label.ifBlank { preview.file.name }
+                        )
                         bindImage(holder, preview)
                     }
                     is PreviewRow.PdfPage -> {
                         holder as AssetHolder
-                        bindAssetDeletion(holder.itemView, holder.caption, row.lineIndex, preview.file)
+                        bindAssetActions(
+                            holder.itemView,
+                            holder.caption,
+                            holder.menu,
+                            row.lineIndex,
+                            preview.file,
+                            preview.label.ifBlank { preview.file.name }
+                        )
                         bindPdf(holder, preview)
                     }
                 }
@@ -197,6 +225,8 @@ class HybridNoteAdapter(
         if (holder is EditorHolder) holder.detach()
         if (holder is AssetHolder) {
             holder.caption.setOnClickListener(null)
+            holder.caption.setOnLongClickListener(null)
+            holder.menu.setOnClickListener(null)
             holder.image.tag = null
             holder.image.setImageDrawable(null)
         }
@@ -277,18 +307,21 @@ class HybridNoteAdapter(
         holder.caption.setOnClickListener { toggleAsset(file) }
     }
 
-    private fun bindAssetDeletion(
-        itemView: android.view.View,
-        actionView: android.view.View,
+    private fun bindAssetActions(
+        itemView: View,
+        actionView: View,
+        menuView: View?,
         lineIndex: Int,
-        file: File
+        file: File,
+        label: String
     ) {
-        val listener = android.view.View.OnLongClickListener {
-            onDeleteAsset(lineIndex, file)
+        val listener = View.OnLongClickListener {
+            onAssetActions(lineIndex, file, label)
             true
         }
         itemView.setOnLongClickListener(listener)
         actionView.setOnLongClickListener(listener)
+        menuView?.setOnClickListener { onAssetActions(lineIndex, file, label) }
     }
 
     private fun isCollapsed(file: File): Boolean = file.canonicalPath in collapsedAssetPaths
@@ -429,10 +462,25 @@ class HybridNoteAdapter(
     private class TextHolder(val text: TextView) : RecyclerView.ViewHolder(text)
 
     private class AssetHolder(container: LinearLayout) : RecyclerView.ViewHolder(container) {
+        private val header = LinearLayout(container.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         val caption = TextView(container.context).apply {
             setTextColor(container.context.getColor(R.color.text_secondary))
             textSize = 13f
-            setPadding(0, 0, 0, (6 * resources.displayMetrics.density).toInt())
+        }
+        val menu = AppCompatImageButton(container.context).apply {
+            setImageResource(R.drawable.ic_more_vert_24)
+            setColorFilter(container.context.getColor(R.color.text_secondary))
+            contentDescription = container.context.getString(R.string.asset_actions)
+            val backgroundValue = TypedValue()
+            container.context.theme.resolveAttribute(
+                android.R.attr.selectableItemBackgroundBorderless,
+                backgroundValue,
+                true
+            )
+            setBackgroundResource(backgroundValue.resourceId)
         }
         val image = ImageView(container.context).apply {
             adjustViewBounds = true
@@ -442,7 +490,16 @@ class HybridNoteAdapter(
         }
 
         init {
-            container.addView(caption, LinearLayout.LayoutParams(
+            header.addView(caption, LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            ))
+            header.addView(menu, LinearLayout.LayoutParams(
+                (40 * container.resources.displayMetrics.density).toInt(),
+                (40 * container.resources.displayMetrics.density).toInt()
+            ))
+            container.addView(header, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))

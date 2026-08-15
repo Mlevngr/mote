@@ -52,6 +52,21 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         if (lines.size == 1) lines[0] = "" else lines.removeAt(index)
     }
 
+    /** Pastes into a blank target line, or directly after a non-blank target line. */
+    fun pasteAt(targetLine: Int?, source: String): IntRange {
+        val replacement = source.replace("\r\n", "\n").replace('\r', '\n')
+            .split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
+        val target = targetLine?.coerceIn(lines.indices)
+        if (target != null && lines[target].isBlank()) return replaceLine(target, replacement)
+
+        if (target == null && lines.size == 1 && lines[0].isBlank()) {
+            return replaceLine(0, replacement)
+        }
+        val insertion = if (target == null) lines.size else target + 1
+        lines.addAll(insertion, replacement)
+        return insertion until insertion + replacement.size
+    }
+
     fun markdown(): String = lines.joinToString("\n")
 
     companion object {

@@ -64,4 +64,22 @@ class MarkdownDocumentTest {
         document.removeLine(0)
         assertEquals(listOf(""), document.snapshot())
     }
+
+    @Test fun pastesIntoAnExistingBlankLine() {
+        val document = MarkdownDocument.parse("Before\n\nAfter")
+        assertEquals(1..1, document.pasteAt(1, "Pasted"))
+        assertEquals("Before\nPasted\nAfter", document.markdown())
+    }
+
+    @Test fun pastesAfterANonBlankBlock() {
+        val document = MarkdownDocument.parse("Before\nAfter")
+        assertEquals(1..2, document.pasteAt(0, "One\nTwo"))
+        assertEquals("Before\nOne\nTwo\nAfter", document.markdown())
+    }
+
+    @Test fun pastesIntoAnEmptyDocumentWithoutLeavingAnExtraLine() {
+        val document = MarkdownDocument.parse("")
+        assertEquals(0..0, document.pasteAt(null, "Pasted"))
+        assertEquals("Pasted", document.markdown())
+    }
 }

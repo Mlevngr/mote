@@ -9,6 +9,15 @@
     <string name="pdf_page_count">共%1$d页</string>
     <string name="remove_inserted_file">删除插入内容</string>
     <string name="remove_inserted_file_confirmation">确定从笔记中删除“%1$s”吗？没有其他引用时，内部文件也会删除。</string>
+    <string name="asset_actions">插入内容操作</string>
+    <string name="move_inserted_file">移动</string>
+    <string name="copy_inserted_file">复制</string>
+    <string name="asset_ready_to_move">已选择移动，在空白行或正文末尾长按粘贴</string>
+    <string name="asset_copied">已复制，在空白行或正文末尾长按粘贴</string>
+    <string name="paste">粘贴</string>
+    <string name="nothing_to_paste">剪贴板中没有可粘贴的内容</string>
+    <string name="pasted">已粘贴</string>
+    <string name="asset_clipboard_unavailable">附件复制信息已失效，未粘贴以避免生成损坏的预览。</string>
     <string name="import_failed">导入失败：%1$s</string>
     <string name="back_to_library">返回笔记库</string>
     <string name="go_up">返回上级文件夹</string>

@@ -1,11 +1,13 @@
 package com.mlevngr.inknote
 
-import android.net.Uri
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.graphics.Rect
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.graphics.Rect
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -28,6 +30,7 @@ import com.mlevngr.inknote.ui.PreviewRowFactory
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import java.io.File
 
 class EditorActivity : AppCompatActivity() {
     private lateinit var library: NoteLibrary
@@ -47,6 +50,7 @@ class EditorActivity : AppCompatActivity() {
     private var lastActiveLine = 0
     private var saveTask: Runnable? = null
     private var noteName = ""
+    private var pendingAssetTransfer: AssetTransfer? = null
     private val workspaceLock = Any()
 
     private val openAsset = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -100,7 +104,8 @@ class EditorActivity : AppCompatActivity() {
             onSplitLine = ::splitLine,
             onMultilineInput = ::replaceLineFromEditor,
             onMergeWithPrevious = ::mergeWithPrevious,
-            onDeleteAsset = ::confirmDeleteAsset
+            onAssetActions = ::showAssetActions,
+            onPasteAt = ::showPasteAt
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
@@ -134,6 +139,10 @@ class EditorActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@EditorActivity)
             adapter = noteAdapter
             itemAnimator = null
+            setOnLongClickListener {
+                showPasteAt(document.size - 1)
+                true
+            }
         }
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
             it.setOnClickListener { toggleMode() }
@@ -372,7 +381,112 @@ class EditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun confirmDeleteAsset(lineIndex: Int, file: java.io.File) {
+    private fun showAssetActions(lineIndex: Int, file: File, label: String) {
+        val actions = arrayOf(
+            getString(R.string.move_inserted_file),
+            getString(R.string.copy_inserted_file),
+            getString(R.string.remove_inserted_file)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(label.ifBlank { file.name })
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> stageAssetTransfer(lineIndex, file, label, move = true)
+                    1 -> stageAssetTransfer(lineIndex, file, label, move = false)
+                    2 -> confirmDeleteAsset(lineIndex, file)
+                }
+            }
+            .show()
+    }
+
+    private fun stageAssetTransfer(lineIndex: Int, file: File, label: String, move: Boolean) {
+        if (lineIndex !in 0 until document.size) return
+        val source = document[lineIndex]
+        pendingAssetTransfer = AssetTransfer(source, lineIndex, move)
+        getSystemService<ClipboardManager>()?.setPrimaryClip(
+            ClipData.newPlainText(label.ifBlank { file.name }, source)
+        )
+        Toast.makeText(
+            this,
+            if (move) R.string.asset_ready_to_move else R.string.asset_copied,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun showPasteAt(targetLine: Int) {
+        val clipboardText = clipboardText()
+        if (pendingAssetTransfer == null && clipboardText.isNullOrEmpty()) {
+            Toast.makeText(this, R.string.nothing_to_paste, Toast.LENGTH_SHORT).show()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setItems(arrayOf(getString(R.string.paste))) { _, _ ->
+                pasteAt(targetLine, clipboardText)
+            }
+            .show()
+    }
+
+    private fun pasteAt(targetLine: Int, clipboardText: String?) {
+        val transfer = pendingAssetTransfer?.takeIf { pending ->
+            clipboardText == null || clipboardText == pending.source
+        }
+        if (pendingAssetTransfer != null && transfer == null) pendingAssetTransfer = null
+        var target = targetLine.coerceIn(0, document.size - 1)
+        val source = if (transfer != null) {
+            if (transfer.move) {
+                val currentSource = locateTransferSource(transfer)
+                if (currentSource >= 0) {
+                    document.removeLine(currentSource)
+                    activeLine = activeLine?.let { active ->
+                        when {
+                            active > currentSource -> active - 1
+                            active == currentSource -> null
+                            else -> active
+                        }
+                    }
+                    if (target > currentSource) target--
+                }
+            }
+            transfer.source
+        } else clipboardText.orEmpty()
+        if (source.isEmpty()) return
+        if (transfer == null) {
+            val assetPath = ASSET_EMBED.matchEntire(source.trim())?.groupValues?.get(1)
+            if (assetPath != null && workspace.resolveAsset(assetPath) == null) {
+                Toast.makeText(this, R.string.asset_clipboard_unavailable, Toast.LENGTH_LONG).show()
+                return
+            }
+        }
+
+        val sizeBeforePaste = document.size
+        val pasted = document.pasteAt(target, source)
+        val insertedLineCount = document.size - sizeBeforePaste
+        if (transfer?.move == true) pendingAssetTransfer = null
+        activeLine = activeLine?.let { active ->
+            if (insertedLineCount > 0 && active >= pasted.first) {
+                active + insertedLineCount
+            } else active
+        }
+        lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+        refreshRows()
+        scheduleSave()
+        Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun locateTransferSource(transfer: AssetTransfer): Int {
+        if (transfer.originalLine in 0 until document.size &&
+            document[transfer.originalLine] == transfer.source
+        ) return transfer.originalLine
+        return document.snapshot().indexOf(transfer.source)
+    }
+
+    private fun clipboardText(): String? {
+        val clipboard = getSystemService<ClipboardManager>() ?: return null
+        if (!clipboard.hasPrimaryClip()) return null
+        return clipboard.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()
+    }
+
+    private fun confirmDeleteAsset(lineIndex: Int, file: File) {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.remove_inserted_file)
             .setMessage(getString(R.string.remove_inserted_file_confirmation, file.name))
@@ -381,7 +495,7 @@ class EditorActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun deleteAsset(lineIndex: Int, file: java.io.File) {
+    private fun deleteAsset(lineIndex: Int, file: File) {
         if (lineIndex !in 0 until document.size) return
         document.removeLine(lineIndex)
         activeLine = activeLine?.let { active ->
@@ -393,9 +507,15 @@ class EditorActivity : AppCompatActivity() {
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         val remainingMarkdown = document.markdown()
+        val retainedClipboardReference = pendingAssetTransfer?.source.orEmpty()
         io.execute {
             synchronized(workspaceLock) {
-                runCatching { workspace.deleteAssetIfUnreferenced(file, remainingMarkdown) }
+                runCatching {
+                    workspace.deleteAssetIfUnreferenced(
+                        file,
+                        "$remainingMarkdown\n$retainedClipboardReference"
+                    )
+                }
             }
         }
         refreshRows()
@@ -419,10 +539,17 @@ class EditorActivity : AppCompatActivity() {
 
     private enum class EditorMode { Read, Edit }
 
+    private data class AssetTransfer(
+        val source: String,
+        val originalLine: Int,
+        val move: Boolean
+    )
+
     companion object {
         private const val SAVE_DELAY_MS = 350L
         private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"
+        private val ASSET_EMBED = Regex("""!\[\[asset:(assets/[^|\]]+)(?:\|[^\]]*)?]]""")
 
         fun intent(
             context: android.content.Context,
