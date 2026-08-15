@@ -15,6 +15,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.mlevngr.inknote.library.NoteLibrary
+import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.SystemBarInsets
 
@@ -23,7 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: NoteLibraryAdapter
     private lateinit var toolbar: MaterialToolbar
     private lateinit var emptyView: TextView
-    private var currentFolder = ""
+    private var currentFolder = FolderLocation.Root
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,7 +32,11 @@ class MainActivity : AppCompatActivity() {
         SystemBarInsets.install(findViewById(R.id.library_root))
 
         library = NoteLibrary(this)
-        currentFolder = savedInstanceState?.getString(STATE_FOLDER).orEmpty()
+        currentFolder = runCatching {
+            savedInstanceState
+                ?.getStringArrayList(STATE_FOLDER)
+                ?.let { FolderLocation(it.toList()) }
+        }.getOrNull() ?: FolderLocation.Root
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
         emptyView = findViewById(R.id.empty_library)
@@ -49,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         toolbar.setNavigationOnClickListener { navigateUp() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentFolder.isNotBlank()) navigateUp()
+                if (currentFolder.names.isNotEmpty()) navigateUp()
                 else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -65,27 +70,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putString(STATE_FOLDER, currentFolder)
+        outState.putStringArrayList(STATE_FOLDER, ArrayList(currentFolder.names))
         super.onSaveInstanceState(outState)
     }
 
     private fun refresh() {
         val entries = runCatching { library.list(currentFolder) }.getOrElse { error ->
-            currentFolder = ""
+            currentFolder = FolderLocation.Root
             Toast.makeText(
                 this,
                 getString(R.string.open_failed, error.message ?: getString(R.string.unknown_error)),
                 Toast.LENGTH_LONG
             ).show()
-            runCatching { library.list("") }.getOrDefault(emptyList())
+            runCatching { library.list(FolderLocation.Root) }.getOrDefault(emptyList())
         }
         adapter.submit(entries)
         emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
         else android.view.View.GONE
-        toolbar.title = library.displayPath(currentFolder)
-            .substringAfterLast(" / ")
-            .ifBlank { getString(R.string.app_name) }
-        if (currentFolder.isBlank()) toolbar.navigationIcon = null
+        toolbar.title = currentFolder.title ?: getString(R.string.app_name)
+        if (currentFolder.names.isEmpty()) toolbar.navigationIcon = null
         else toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
         toolbar.navigationContentDescription = getString(R.string.go_up)
     }
@@ -94,7 +97,8 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             when (entry.type) {
                 NoteLibrary.EntryType.Folder -> {
-                    currentFolder = library.findFolder(currentFolder, entry.name).relativePath
+                    library.findFolder(currentFolder, entry.name)
+                    currentFolder = currentFolder.child(entry.name)
                     refresh()
                 }
                 NoteLibrary.EntryType.Note -> {
@@ -112,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateUp() {
-        currentFolder = library.parentOf(currentFolder) ?: ""
+        currentFolder = currentFolder.parent() ?: FolderLocation.Root
         refresh()
     }
 
@@ -174,7 +178,11 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.delete_note)
             )
         } else {
-            arrayOf(getString(R.string.rename_folder), getString(R.string.delete_folder))
+            arrayOf(
+                getString(R.string.rename_folder),
+                getString(R.string.move_folder),
+                getString(R.string.delete_folder)
+            )
         }
         MaterialAlertDialogBuilder(this)
             .setTitle(entry.name)
@@ -182,12 +190,13 @@ class MainActivity : AppCompatActivity() {
                 when (entry.type) {
                     NoteLibrary.EntryType.Note -> when (which) {
                         0 -> showRenameDialog(entry)
-                        1 -> showMoveDialog(entry)
+                        1 -> showMoveNoteDialog(entry)
                         2 -> showDeleteNoteConfirmation(entry)
                     }
                     NoteLibrary.EntryType.Folder -> when (which) {
                         0 -> showRenameDialog(entry)
-                        1 -> showDeleteFolderConfirmation(entry)
+                        1 -> showMoveFolderDialog(entry)
+                        2 -> showDeleteFolderConfirmation(entry)
                     }
                 }
             }
@@ -297,15 +306,18 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showMoveDialog(note: NoteLibrary.Entry) {
-        val destinations = listOf<String?>(null) + library.listFolders().map { it.relativePath }
-        val labels = destinations.map { path ->
-            path?.let(library::displayPath) ?: getString(R.string.library_root)
-        }.toTypedArray()
+    private fun showMoveNoteDialog(note: NoteLibrary.Entry) {
+        val destinations = (listOf(FolderLocation.Root) + library.listFolderLocations())
+            .filter { it != currentFolder }
+        if (destinations.isEmpty()) {
+            Toast.makeText(this, R.string.no_move_destination, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = destinations.map(::folderLabel).toTypedArray()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.move_to)
             .setItems(labels) { _, which ->
-                val target = destinations[which].orEmpty()
+                val target = destinations[which]
                 runCatching { library.moveNote(currentFolder, note.name, target) }
                     .onSuccess {
                         refresh()
@@ -317,6 +329,42 @@ class MainActivity : AppCompatActivity() {
             }
             .show()
     }
+
+    private fun showMoveFolderDialog(folder: NoteLibrary.Entry) {
+        val source = currentFolder.child(folder.name)
+        val destinations = (listOf(FolderLocation.Root) + library.listFolderLocations())
+            .filter { target ->
+                target != currentFolder && !target.isWithin(source)
+            }
+        if (destinations.isEmpty()) {
+            Toast.makeText(this, R.string.no_move_destination, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = destinations.map(::folderLabel).toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.move_to)
+            .setItems(labels) { _, which ->
+                runCatching { library.moveFolder(currentFolder, folder.name, destinations[which]) }
+                    .onSuccess {
+                        refresh()
+                        Toast.makeText(this, R.string.folder_moved, Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        Toast.makeText(
+                            this,
+                            it.message ?: getString(R.string.move_failed),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+            .show()
+    }
+
+    private fun folderLabel(location: FolderLocation): String =
+        location.displayPath.ifBlank { getString(R.string.library_root) }
+
+    private fun FolderLocation.isWithin(ancestor: FolderLocation): Boolean =
+        names.size >= ancestor.names.size && names.take(ancestor.names.size) == ancestor.names
 
     private enum class CreateType { Folder, Note }
 

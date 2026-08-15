@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.mlevngr.inknote.assets.NoteWorkspace
+import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
@@ -54,9 +55,11 @@ class EditorActivity : AppCompatActivity() {
                 finish()
                 return
             }
-        val folderPath = intent.getStringExtra(EXTRA_FOLDER_PATH).orEmpty()
+        val folderLocation = FolderLocation(
+            intent.getStringArrayListExtra(EXTRA_FOLDER_NAMES).orEmpty().toList()
+        )
         val initialState = runCatching {
-            NoteWorkspace(this, folderPath, noteName).let {
+            NoteWorkspace(this, folderLocation, noteName).let {
                 it to MarkdownDocument.parse(it.load(DEFAULT_NOTE))
             }
         }.getOrElse {
@@ -260,12 +263,16 @@ class EditorActivity : AppCompatActivity() {
 
     companion object {
         private const val SAVE_DELAY_MS = 350L
-        private const val EXTRA_FOLDER_PATH = "folder_path"
+        private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"
 
-        fun intent(context: android.content.Context, folderPath: String, noteName: String): Intent =
+        fun intent(
+            context: android.content.Context,
+            folderLocation: FolderLocation,
+            noteName: String
+        ): Intent =
             Intent(context, EditorActivity::class.java)
-                .putExtra(EXTRA_FOLDER_PATH, folderPath)
+                .putStringArrayListExtra(EXTRA_FOLDER_NAMES, ArrayList(folderLocation.names))
                 .putExtra(EXTRA_NOTE_NAME, noteName)
 
         val DEFAULT_NOTE = """

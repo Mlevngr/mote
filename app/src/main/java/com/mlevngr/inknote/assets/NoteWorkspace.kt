@@ -5,11 +5,12 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.mlevngr.inknote.library.NoteLibrary
+import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import java.io.File
 import java.util.UUID
 
-class NoteWorkspace(context: Context, folderPath: String, noteName: String) {
-    val root = NoteLibrary(context).findNoteDirectory(folderPath, noteName)
+class NoteWorkspace(context: Context, folderLocation: FolderLocation, noteName: String) {
+    val root = NoteLibrary(context).findNoteDirectory(folderLocation, noteName)
     private val assets = File(root, "assets").also(File::mkdirs)
     private val markdownFile = File(root, "note.md")
 
