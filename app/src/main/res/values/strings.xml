@@ -4,6 +4,11 @@
     <string name="switch_to_edit_mode">切换到编辑模式</string>
     <string name="switch_to_read_mode">切换到阅读模式</string>
     <string name="insert_asset">插入文件</string>
+    <string name="expand_preview">展开%1$s预览</string>
+    <string name="collapse_preview">收起%1$s预览</string>
+    <string name="pdf_page_count">共%1$d页</string>
+    <string name="remove_inserted_file">删除插入内容</string>
+    <string name="remove_inserted_file_confirmation">确定从笔记中删除“%1$s”吗？没有其他引用时，内部文件也会删除。</string>
     <string name="import_failed">导入失败：%1$s</string>
     <string name="back_to_library">返回笔记库</string>
     <string name="go_up">返回上级文件夹</string>

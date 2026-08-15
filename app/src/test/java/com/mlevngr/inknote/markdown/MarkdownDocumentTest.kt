@@ -52,4 +52,16 @@ class MarkdownDocumentTest {
     @Test fun emptyDocumentStillHasAnEditableLine() {
         assertEquals(listOf(""), MarkdownDocument.parse("").snapshot())
     }
+
+    @Test fun removesAnEmbeddedAssetLineWithoutCrossingIntoOtherLines() {
+        val document = MarkdownDocument.parse("Before\n![[asset:assets/photo.jpg|Photo]]\nAfter")
+        document.removeLine(1)
+        assertEquals("Before\nAfter", document.markdown())
+    }
+
+    @Test fun removingTheOnlyLineLeavesAnEditableEmptyBody() {
+        val document = MarkdownDocument.parse("Only line")
+        document.removeLine(0)
+        assertEquals(listOf(""), document.snapshot())
+    }
 }

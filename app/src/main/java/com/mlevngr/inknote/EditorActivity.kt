@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.graphics.Rect
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -15,6 +16,7 @@ import androidx.core.content.getSystemService
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.library.NoteLibrary
@@ -54,7 +56,15 @@ class EditorActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_editor)
-        SystemBarInsets.install(findViewById(R.id.app_root))
+        SystemBarInsets.install(
+            findViewById(R.id.app_root),
+            avoidIme = true,
+            onInsetsChanged = {
+                if (::recyclerView.isInitialized && ::noteAdapter.isInitialized) {
+                    ensureActiveEditorVisible()
+                }
+            }
+        )
 
         noteName = intent.getStringExtra(EXTRA_NOTE_NAME)
             ?.takeIf(String::isNotBlank)
@@ -89,7 +99,8 @@ class EditorActivity : AppCompatActivity() {
             onLineChanged = ::updateLine,
             onSplitLine = ::splitLine,
             onMultilineInput = ::replaceLineFromEditor,
-            onMergeWithPrevious = ::mergeWithPrevious
+            onMergeWithPrevious = ::mergeWithPrevious,
+            onDeleteAsset = ::confirmDeleteAsset
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
@@ -247,6 +258,7 @@ class EditorActivity : AppCompatActivity() {
         if (index !in 0 until document.size) return
         document.update(index, source)
         scheduleSave()
+        ensureActiveEditorVisible()
     }
 
     private fun splitLine(index: Int, cursor: Int) {
@@ -299,10 +311,35 @@ class EditorActivity : AppCompatActivity() {
                         active.takeIf { requestFocus },
                         cursorPosition
                     )
+                    if (editing) ensureActiveEditorVisible()
                 }
             }
         }
     }
+
+    private fun ensureActiveEditorVisible(retry: Boolean = true) {
+        val line = activeLine ?: return
+        val position = noteAdapter.positionOfLine(line)
+        if (position < 0) return
+        recyclerView.post {
+            val holder = recyclerView.findViewHolderForAdapterPosition(position)
+            if (holder == null) {
+                if (retry) {
+                    recyclerView.scrollToPosition(position)
+                    recyclerView.post { ensureActiveEditorVisible(retry = false) }
+                }
+                return@post
+            }
+            val view = holder.itemView
+            view.requestRectangleOnScreen(
+                Rect(0, 0, view.width, view.height + dp(24)),
+                false
+            )
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun scheduleSave() {
         saveTask?.let(main::removeCallbacks)
@@ -333,6 +370,36 @@ class EditorActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun confirmDeleteAsset(lineIndex: Int, file: java.io.File) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.remove_inserted_file)
+            .setMessage(getString(R.string.remove_inserted_file_confirmation, file.name))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ -> deleteAsset(lineIndex, file) }
+            .show()
+    }
+
+    private fun deleteAsset(lineIndex: Int, file: java.io.File) {
+        if (lineIndex !in 0 until document.size) return
+        document.removeLine(lineIndex)
+        activeLine = activeLine?.let { active ->
+            when {
+                active > lineIndex -> active - 1
+                active == lineIndex -> lineIndex.coerceAtMost(document.size - 1)
+                else -> active
+            }
+        }
+        lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+        val remainingMarkdown = document.markdown()
+        io.execute {
+            synchronized(workspaceLock) {
+                runCatching { workspace.deleteAssetIfUnreferenced(file, remainingMarkdown) }
+            }
+        }
+        refreshRows()
+        scheduleSave()
     }
 
     override fun onStop() {

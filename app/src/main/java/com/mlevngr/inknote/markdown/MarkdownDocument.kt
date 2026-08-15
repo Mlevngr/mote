@@ -47,6 +47,11 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return index until index + replacement.size
     }
 
+    fun removeLine(index: Int) {
+        require(index in lines.indices) { "Line index is out of bounds" }
+        if (lines.size == 1) lines[0] = "" else lines.removeAt(index)
+    }
+
     fun markdown(): String = lines.joinToString("\n")
 
     companion object {

@@ -39,6 +39,16 @@ class NoteWorkspace(context: Context, folderLocation: FolderLocation, private va
     fun resolveAsset(relativePath: String): File? =
         AssetPathPolicy.resolve(root, relativePath)?.takeIf(File::isFile)
 
+    fun deleteAssetIfUnreferenced(file: File, remainingMarkdown: String): Boolean {
+        val canonicalFile = file.canonicalFile
+        val canonicalAssets = assets.canonicalFile
+        val assetPrefix = "${canonicalAssets.path}${File.separator}"
+        require(canonicalFile.path.startsWith(assetPrefix)) { "Asset is outside this note" }
+        val relativePath = canonicalFile.relativeTo(root.canonicalFile).invariantSeparatorsPath
+        if (relativePath in remainingMarkdown) return false
+        return !canonicalFile.exists() || canonicalFile.delete()
+    }
+
     fun import(resolver: ContentResolver, uri: Uri): ImportedAsset {
         val displayName = queryDisplayName(resolver, uri) ?: "attachment"
         val mimeType = resolver.getType(uri)

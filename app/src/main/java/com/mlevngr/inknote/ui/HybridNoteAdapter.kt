@@ -12,6 +12,7 @@ import android.text.TextWatcher
 import android.util.LruCache
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -41,7 +42,8 @@ class HybridNoteAdapter(
     private val onLineChanged: (Int, String) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
-    private val onMergeWithPrevious: (Int) -> Boolean
+    private val onMergeWithPrevious: (Int) -> Boolean,
+    private val onDeleteAsset: (Int, File) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
@@ -55,7 +57,9 @@ class HybridNoteAdapter(
     private val bitmapCache = object : LruCache<String, Bitmap>(48 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
+    private var allRows: List<HybridRow> = emptyList()
     private var rows: List<HybridRow> = emptyList()
+    private val collapsedAssetPaths = mutableSetOf<String>()
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
     private var editing = false
@@ -68,12 +72,18 @@ class HybridNoteAdapter(
         focusLine: Int? = null,
         focusCursor: Int? = null
     ) {
-        rows = newRows
+        allRows = newRows
+        val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetFile)
+            .mapTo(mutableSetOf()) { it.canonicalPath }
+        collapsedAssetPaths.retainAll(availableAssets)
+        rebuildVisibleRows()
         this.editing = editing
         this.focusLine = focusLine
         this.focusCursor = focusCursor
         notifyDataSetChanged()
     }
+
+    fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
 
     override fun getItemCount(): Int = rows.size
 
@@ -137,30 +147,45 @@ class HybridNoteAdapter(
                 holder.itemView.setOnClickListener(if (editing) {
                     { onActivate(row.lineIndex) }
                 } else null)
-                holder.itemView.setOnLongClickListener(if (!editing) {
-                    {
-                        onLongActivate(row.lineIndex)
-                        true
-                    }
-                } else null)
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
+                        holder.text.setTextIsSelectable(!editing)
+                        holder.text.setOnClickListener(if (editing) {
+                            { onActivate(row.lineIndex) }
+                        } else null)
+                        holder.text.setOnLongClickListener(null)
+                        holder.itemView.setOnLongClickListener(null)
                         holder.text.setTextColor(context.getColor(R.color.text_primary))
                         markwon.setMarkdown(holder.text, preview.source)
                     }
                     is PreviewRow.Attachment -> {
                         holder as TextHolder
+                        holder.text.setTextIsSelectable(false)
+                        bindAssetDeletion(holder.itemView, holder.text, row.lineIndex, preview.file)
                         holder.text.setTextColor(context.getColor(R.color.primary))
                         holder.text.text = "📎  ${preview.label}  •  ${formatSize(preview.file.length())}"
                     }
                     is PreviewRow.Error -> {
                         holder as TextHolder
+                        holder.text.setTextIsSelectable(false)
+                        holder.text.setOnLongClickListener(null)
+                        holder.itemView.setOnLongClickListener(if (!editing) {
+                            { onLongActivate(row.lineIndex); true }
+                        } else null)
                         holder.text.setTextColor(context.getColor(R.color.error_text))
                         holder.text.text = preview.message
                     }
-                    is PreviewRow.Image -> bindImage(holder as AssetHolder, preview)
-                    is PreviewRow.PdfPage -> bindPdf(holder as AssetHolder, preview)
+                    is PreviewRow.Image -> {
+                        holder as AssetHolder
+                        bindAssetDeletion(holder.itemView, holder.caption, row.lineIndex, preview.file)
+                        bindImage(holder, preview)
+                    }
+                    is PreviewRow.PdfPage -> {
+                        holder as AssetHolder
+                        bindAssetDeletion(holder.itemView, holder.caption, row.lineIndex, preview.file)
+                        bindPdf(holder, preview)
+                    }
                 }
             }
         }
@@ -171,6 +196,7 @@ class HybridNoteAdapter(
         holder.itemView.setOnLongClickListener(null)
         if (holder is EditorHolder) holder.detach()
         if (holder is AssetHolder) {
+            holder.caption.setOnClickListener(null)
             holder.image.tag = null
             holder.image.setImageDrawable(null)
         }
@@ -202,13 +228,32 @@ class HybridNoteAdapter(
     }
 
     private fun bindImage(holder: AssetHolder, row: PreviewRow.Image) {
-        holder.caption.text = row.label.ifBlank { row.file.name }
+        val collapsed = isCollapsed(row.file)
+        bindAssetHeader(holder, row.file, row.label.ifBlank { row.file.name }, collapsed)
+        holder.image.visibility = if (collapsed) View.GONE else View.VISIBLE
+        if (collapsed) {
+            holder.image.tag = null
+            holder.image.setImageDrawable(null)
+            return
+        }
         val key = "image:${row.file.path}:${row.file.lastModified()}:$targetWidth"
         loadBitmap(holder, key) { decodeImage(row.file, targetWidth) }
     }
 
     private fun bindPdf(holder: AssetHolder, row: PreviewRow.PdfPage) {
-        holder.caption.text = "${row.label}  •  ${row.pageIndex + 1}/${row.pageCount}"
+        val collapsed = isCollapsed(row.file)
+        val pageLabel = if (collapsed) {
+            "${row.label}  •  ${context.getString(R.string.pdf_page_count, row.pageCount)}"
+        } else {
+            "${row.label}  •  ${row.pageIndex + 1}/${row.pageCount}"
+        }
+        bindAssetHeader(holder, row.file, pageLabel, collapsed)
+        holder.image.visibility = if (collapsed) View.GONE else View.VISIBLE
+        if (collapsed) {
+            holder.image.tag = null
+            holder.image.setImageDrawable(null)
+            return
+        }
         val key = "pdf:${row.file.path}:${row.file.lastModified()}:${row.pageIndex}:$targetWidth"
         loadBitmap(holder, key) {
             val source = synchronized(pdfSources) {
@@ -216,6 +261,47 @@ class HybridNoteAdapter(
             }
             source.render(row.pageIndex, targetWidth)
         }
+    }
+
+    private fun bindAssetHeader(
+        holder: AssetHolder,
+        file: File,
+        label: String,
+        collapsed: Boolean
+    ) {
+        holder.caption.text = "${if (collapsed) '▶' else '▼'}  $label"
+        holder.caption.contentDescription = context.getString(
+            if (collapsed) R.string.expand_preview else R.string.collapse_preview,
+            label
+        )
+        holder.caption.setOnClickListener { toggleAsset(file) }
+    }
+
+    private fun bindAssetDeletion(
+        itemView: android.view.View,
+        actionView: android.view.View,
+        lineIndex: Int,
+        file: File
+    ) {
+        val listener = android.view.View.OnLongClickListener {
+            onDeleteAsset(lineIndex, file)
+            true
+        }
+        itemView.setOnLongClickListener(listener)
+        actionView.setOnLongClickListener(listener)
+    }
+
+    private fun isCollapsed(file: File): Boolean = file.canonicalPath in collapsedAssetPaths
+
+    private fun toggleAsset(file: File) {
+        val key = file.canonicalPath
+        if (!collapsedAssetPaths.add(key)) collapsedAssetPaths.remove(key)
+        rebuildVisibleRows()
+        notifyDataSetChanged()
+    }
+
+    private fun rebuildVisibleRows() {
+        rows = AssetPreviewVisibility.visibleRows(allRows, collapsedAssetPaths)
     }
 
     private fun loadBitmap(holder: AssetHolder, key: String, loader: () -> Bitmap) {
