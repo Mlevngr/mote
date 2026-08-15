@@ -3,7 +3,6 @@ package com.mlevngr.inknote.ui
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +13,8 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -37,7 +38,8 @@ class HybridNoteAdapter(
     private val onActivate: (Int) -> Unit,
     private val onLongActivate: (Int) -> Unit,
     private val onLineChanged: (Int, String) -> Unit,
-    private val onSplitLine: (Int, Int) -> Unit
+    private val onSplitLine: (Int, Int) -> Unit,
+    private val onMergeWithPrevious: (Int) -> Boolean
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
 
     private val markwon = Markwon.builder(context)
@@ -53,14 +55,21 @@ class HybridNoteAdapter(
     }
     private var rows: List<HybridRow> = emptyList()
     private var focusLine: Int? = null
+    private var focusCursor: Int? = null
     private var editing = false
     private val horizontalPadding = dp(18)
     private val targetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
 
-    fun submit(newRows: List<HybridRow>, editing: Boolean, focusLine: Int? = null) {
+    fun submit(
+        newRows: List<HybridRow>,
+        editing: Boolean,
+        focusLine: Int? = null,
+        focusCursor: Int? = null
+    ) {
         rows = newRows
         this.editing = editing
         this.focusLine = focusLine
+        this.focusCursor = focusCursor
         notifyDataSetChanged()
     }
 
@@ -79,7 +88,7 @@ class HybridNoteAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
         when (viewType) {
-            TYPE_EDITOR -> EditorHolder(TextInputEditText(context).apply {
+            TYPE_EDITOR -> EditorHolder(LineEditText(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -130,17 +139,17 @@ class HybridNoteAdapter(
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
-                        holder.text.setTextColor(Color.rgb(35, 35, 40))
+                        holder.text.setTextColor(context.getColor(R.color.text_primary))
                         markwon.setMarkdown(holder.text, preview.source)
                     }
                     is PreviewRow.Attachment -> {
                         holder as TextHolder
-                        holder.text.setTextColor(Color.rgb(65, 82, 110))
+                        holder.text.setTextColor(context.getColor(R.color.primary))
                         holder.text.text = "📎  ${preview.label}  •  ${formatSize(preview.file.length())}"
                     }
                     is PreviewRow.Error -> {
                         holder as TextHolder
-                        holder.text.setTextColor(Color.rgb(180, 45, 45))
+                        holder.text.setTextColor(context.getColor(R.color.error_text))
                         holder.text.text = preview.message
                     }
                     is PreviewRow.Image -> bindImage(holder as AssetHolder, preview)
@@ -161,12 +170,23 @@ class HybridNoteAdapter(
     }
 
     private fun bindEditor(holder: EditorHolder, row: HybridRow.Editor) {
-        holder.bind(row.lineIndex, row.source, onLineChanged, onSplitLine)
+        holder.bind(
+            row.lineIndex,
+            row.source,
+            onLineChanged,
+            onSplitLine,
+            onMergeWithPrevious
+        )
         if (focusLine == row.lineIndex) {
             focusLine = null
+            val cursor = focusCursor
+            focusCursor = null
             holder.editor.post {
                 holder.editor.requestFocus()
-                holder.editor.setSelection(holder.editor.text?.length ?: 0)
+                holder.editor.setSelection(
+                    (cursor ?: holder.editor.text?.length ?: 0)
+                        .coerceIn(0, holder.editor.text?.length ?: 0)
+                )
                 context.getSystemService<InputMethodManager>()
                     ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
             }
@@ -232,14 +252,15 @@ class HybridNoteAdapter(
     private fun dp(value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
 
-    private class EditorHolder(val editor: TextInputEditText) : RecyclerView.ViewHolder(editor) {
+    private class EditorHolder(val editor: LineEditText) : RecyclerView.ViewHolder(editor) {
         private var watcher: TextWatcher? = null
 
         fun bind(
             lineIndex: Int,
             source: String,
             onChanged: (Int, String) -> Unit,
-            onSplit: (Int, Int) -> Unit
+            onSplit: (Int, Int) -> Unit,
+            onMerge: (Int) -> Boolean
         ) {
             detach()
             if (editor.text?.toString() != source) editor.setText(source)
@@ -249,6 +270,7 @@ class HybridNoteAdapter(
                     onChanged(lineIndex, s?.toString().orEmpty())
                 override fun afterTextChanged(s: Editable?) = Unit
             }.also(editor::addTextChangedListener)
+            editor.onDeleteAtStart = { onMerge(lineIndex) }
             editor.setOnEditorActionListener { _, actionId, event ->
                 val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER &&
                     event.action == KeyEvent.ACTION_DOWN
@@ -263,6 +285,39 @@ class HybridNoteAdapter(
             watcher?.let(editor::removeTextChangedListener)
             watcher = null
             editor.setOnEditorActionListener(null)
+            editor.onDeleteAtStart = null
+        }
+    }
+
+    private class LineEditText(context: Context) : TextInputEditText(context) {
+        var onDeleteAtStart: (() -> Boolean)? = null
+
+        private fun deleteAtStart(): Boolean {
+            if (selectionStart != 0 || selectionEnd != 0) return false
+            return onDeleteAtStart?.invoke() == true
+        }
+
+        override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+            if (keyCode == KeyEvent.KEYCODE_DEL && deleteAtStart()) return true
+            return super.onKeyDown(keyCode, event)
+        }
+
+        override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+            val target = super.onCreateInputConnection(outAttrs) ?: return null
+            return object : InputConnectionWrapper(target, false) {
+                override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                    if (beforeLength > 0 && deleteAtStart()) return true
+                    return super.deleteSurroundingText(beforeLength, afterLength)
+                }
+
+                override fun deleteSurroundingTextInCodePoints(
+                    beforeLength: Int,
+                    afterLength: Int
+                ): Boolean {
+                    if (beforeLength > 0 && deleteAtStart()) return true
+                    return super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+                }
+            }
         }
     }
 
@@ -270,14 +325,14 @@ class HybridNoteAdapter(
 
     private class AssetHolder(container: LinearLayout) : RecyclerView.ViewHolder(container) {
         val caption = TextView(container.context).apply {
-            setTextColor(Color.rgb(90, 90, 100))
+            setTextColor(container.context.getColor(R.color.text_secondary))
             textSize = 13f
             setPadding(0, 0, 0, (6 * resources.displayMetrics.density).toInt())
         }
         val image = ImageView(container.context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(Color.rgb(245, 245, 247))
+            setBackgroundColor(container.context.getColor(R.color.preview_background))
             contentDescription = "Embedded note asset"
         }
 

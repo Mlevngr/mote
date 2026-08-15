@@ -10,13 +10,27 @@ android {
         applicationId = "com.mlevngr.inknote"
         minSdk = 28
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = 5
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("stableDevelopment") {
+            storeFile = rootProject.file("signing/inknote-dev.jks")
+            storePassword = "inknote-dev-v1"
+            keyAlias = "inknote"
+            keyPassword = "inknote-dev-v1"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("stableDevelopment")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

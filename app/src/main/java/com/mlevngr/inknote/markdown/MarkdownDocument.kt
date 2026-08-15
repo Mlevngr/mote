@@ -28,6 +28,15 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return index + 1
     }
 
+    /** Joins this line into the previous line and returns the new cursor position. */
+    fun mergeWithPrevious(index: Int): Int? {
+        if (index !in 1 until lines.size) return null
+        val cursor = lines[index - 1].length
+        lines[index - 1] += lines[index]
+        lines.removeAt(index)
+        return cursor
+    }
+
     fun markdown(): String = lines.joinToString("\n")
 
     companion object {

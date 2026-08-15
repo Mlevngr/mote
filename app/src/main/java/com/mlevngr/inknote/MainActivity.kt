@@ -57,7 +57,8 @@ class MainActivity : AppCompatActivity() {
             onActivate = ::activateLine,
             onLongActivate = ::enterEditModeAt,
             onLineChanged = ::updateLine,
-            onSplitLine = ::splitLine
+            onSplitLine = ::splitLine,
+            onMergeWithPrevious = ::mergeWithPrevious
         )
 
         findViewById<MaterialToolbar>(R.id.toolbar).title = getString(R.string.app_name)
@@ -154,11 +155,21 @@ class MainActivity : AppCompatActivity() {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return
         activeLine = document.splitLine(index, cursor)
         lastActiveLine = activeLine ?: index
-        refreshRows(requestFocus = true)
+        refreshRows(requestFocus = true, cursorPosition = 0)
         scheduleSave()
     }
 
-    private fun refreshRows(requestFocus: Boolean = false) {
+    private fun mergeWithPrevious(index: Int): Boolean {
+        if (mode != EditorMode.Edit) return false
+        val cursor = document.mergeWithPrevious(index) ?: return false
+        activeLine = index - 1
+        lastActiveLine = activeLine ?: 0
+        refreshRows(requestFocus = true, cursorPosition = cursor)
+        scheduleSave()
+        return true
+    }
+
+    private fun refreshRows(requestFocus: Boolean = false, cursorPosition: Int? = null) {
         val revision = renderRevision.incrementAndGet()
         val lines = document.snapshot()
         val active = activeLine
@@ -167,7 +178,12 @@ class MainActivity : AppCompatActivity() {
             val rows = rowFactory.create(lines, active)
             main.post {
                 if (!isDestroyed && revision == renderRevision.get()) {
-                    noteAdapter.submit(rows, editing, active.takeIf { requestFocus })
+                    noteAdapter.submit(
+                        rows,
+                        editing,
+                        active.takeIf { requestFocus },
+                        cursorPosition
+                    )
                 }
             }
         }

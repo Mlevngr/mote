@@ -8,4 +8,5 @@
     <color name="preview_background">#FFFDF8</color>
     <color name="text_primary">#232328</color>
     <color name="text_secondary">#666672</color>
+    <color name="error_text">#B3261E</color>
 </resources>

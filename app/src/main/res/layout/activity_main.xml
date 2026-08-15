@@ -29,7 +29,7 @@
                 android:contentDescription="@string/insert_asset"
                 android:padding="12dp"
                 android:src="@drawable/ic_link_24"
-                app:tint="@color/text_primary" />
+                app:tint="?attr/colorOnSurface" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/toggle_mode"
@@ -39,7 +39,7 @@
                 android:contentDescription="@string/switch_to_edit_mode"
                 android:padding="12dp"
                 android:src="@drawable/ic_edit_24"
-                app:tint="@color/text_primary" />
+                app:tint="?attr/colorOnSurface" />
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 

@@ -4,9 +4,13 @@
 
 ## 下载 APK
 
-**[直接下载 InkNote 0.3.1 APK](https://github.com/Mlevngr/note/releases/download/v0.3.1/InkNote-0.3.1-debug.apk)**
+**[直接下载 InkNote 0.4.0 APK](https://github.com/Mlevngr/note/releases/download/v0.4.0/InkNote-0.4.0.apk)**
 
-也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用 Android Debug 签名，适合当前测试阶段直接安装。
+也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
+
+> 0.4.0 首次切换到固定签名，因此从 0.3.1 升级时需要最后卸载一次旧版。安装
+> 0.4.0 后，后续 GitHub Release 可以直接覆盖更新。固定签名仅用于当前开源测试分发，
+> 不是未来 Google Play 的生产密钥。
 
 ## 行级编辑与实时预览
 
@@ -19,7 +23,15 @@ InkNote 有清晰的阅读、编辑两种模式：
 - 点击另一行会直接移动编辑位置，不需要点击“完成”。
 - 阅读模式下长按任意行会直接进入编辑模式并定位到该行。
 - 在当前行按回车会拆分并进入下一行。
+- 在行首按退格会合并到上一行，刚换行后可立即退回上一行。
 - 右上角的书写/阅读图标切换模式，链接形状的图标统一负责插入文件。
+- 图标、状态栏和编辑界面跟随系统明亮/深色主题。
+
+当前测试签名证书 SHA-256：
+
+```text
+59:BD:95:A3:7B:99:16:C7:DC:07:3C:AF:54:47:4E:5F:ED:5E:A1:12:27:0D:A2:2F:7D:F1:4C:33:69:2E:D1:2D
+```
 
 ## 文件插入
 

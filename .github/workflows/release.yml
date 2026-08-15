@@ -27,14 +27,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Test, lint and build APK
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+        run: ./gradlew testDebugUnitTest lintDebug assembleRelease
 
       - name: Prepare release asset
-        run: cp app/build/outputs/apk/debug/app-debug.apk "InkNote-${GITHUB_REF_NAME#v}-debug.apk"
+        run: cp app/build/outputs/apk/release/app-release.apk "InkNote-${GITHUB_REF_NAME#v}.apk"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
           generate_release_notes: true
-          files: InkNote-*-debug.apk
+          files: InkNote-*.apk

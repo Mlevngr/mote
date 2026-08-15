@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#BAC3FF</color>
+    <color name="app_background">#121318</color>
+    <color name="toolbar_background">#121318</color>
+    <color name="editor_background">#1C1D24</color>
+    <color name="editor_border">#454650</color>
+    <color name="preview_background">#1C1D24</color>
+    <color name="text_primary">#E5E1E9</color>
+    <color name="text_secondary">#C9C5D0</color>
+    <color name="error_text">#FFB4AB</color>
+</resources>
