@@ -28,11 +28,15 @@ enum class LibraryLayoutMode(val id: String) {
 }
 
 enum class NotePreviewMode(val id: String) {
-    Thumbnail("thumbnail"),
+    RenderedPage("rendered_page"),
+    Summary("summary"),
     TitleOnly("title_only");
 
     companion object {
-        fun fromId(id: String?): NotePreviewMode = entries.firstOrNull { it.id == id } ?: Thumbnail
+        fun fromId(id: String?): NotePreviewMode = when (id) {
+            "thumbnail" -> RenderedPage
+            else -> entries.firstOrNull { it.id == id } ?: RenderedPage
+        }
     }
 }
 

@@ -65,7 +65,8 @@
     <string name="layout_samsung">Samsung 风格（文件夹置顶）</string>
     <string name="layout_list">紧凑列表</string>
     <string name="layout_grid">缩略图网格</string>
-    <string name="preview_thumbnail">首页图片与摘要</string>
+    <string name="preview_rendered_page">第一页渲染预览</string>
+    <string name="preview_summary">正文摘要</string>
     <string name="preview_title_only">仅显示标题</string>
     <string name="folders_section">文件夹</string>
     <string name="notes_section">笔记</string>

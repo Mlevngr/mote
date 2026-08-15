@@ -197,7 +197,8 @@ class MainActivity : AppCompatActivity() {
     private fun showPreviewDialog() {
         val modes = NotePreviewMode.entries
         val labels = arrayOf(
-            getString(R.string.preview_thumbnail),
+            getString(R.string.preview_rendered_page),
+            getString(R.string.preview_summary),
             getString(R.string.preview_title_only)
         )
         MaterialAlertDialogBuilder(this)

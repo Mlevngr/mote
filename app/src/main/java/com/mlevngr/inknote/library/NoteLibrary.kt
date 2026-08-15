@@ -1,7 +1,6 @@
 package com.mlevngr.inknote.library
 
 import android.content.Context
-import com.mlevngr.inknote.assets.AssetPathPolicy
 import java.io.File
 
 class NoteLibrary internal constructor(private val root: File) {
@@ -33,8 +32,8 @@ class NoteLibrary internal constructor(private val root: File) {
         val modifiedAt: Long,
         val childCount: Int = 0,
         val folderColor: FolderColor = FolderColor.Blue,
-        val preview: NotePreview = NotePreview("", null),
-        val previewImage: File? = null
+        val preview: NotePreview = NotePreview(""),
+        val noteDirectory: File? = null
     )
 
     fun list(location: FolderLocation): List<Entry> = requireFolder(location)
@@ -233,8 +232,8 @@ class NoteLibrary internal constructor(private val root: File) {
                     val length = reader.read(buffer).coerceAtLeast(0)
                     NotePreviewExtractor.extract(buffer.concatToString(0, length))
                 }
-            }.getOrDefault(NotePreview("", null))
-        } else NotePreview("", null)
+            }.getOrDefault(NotePreview(""))
+        } else NotePreview("")
         return Entry(
             name = displayName(directory, type),
             relativePath = directory.relativeTo(root).invariantSeparatorsPath,
@@ -249,9 +248,7 @@ class NoteLibrary internal constructor(private val root: File) {
                 FolderColor.fromId(runCatching { File(directory, FOLDER_COLOR_FILE).readText().trim() }.getOrNull())
             } else FolderColor.Blue,
             preview = preview,
-            previewImage = preview.imageRelativePath?.let { relative ->
-                AssetPathPolicy.resolve(directory, relative)?.takeIf(File::isFile)
-            }
+            noteDirectory = directory.takeIf { type == EntryType.Note }
         )
     }
 

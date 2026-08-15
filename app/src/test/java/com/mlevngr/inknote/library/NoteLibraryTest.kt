@@ -330,6 +330,7 @@ class NoteLibraryTest {
         val listed = library.list(rootLocation).single()
 
         assertEquals("Summer Memories", listed.preview.excerpt)
-        assertEquals("cover.jpg", listed.previewImage?.name)
+        assertTrue(listed.preview.renderSource.contains("assets/cover.jpg"))
+        assertEquals(File(root, note.relativePath).canonicalFile, listed.noteDirectory?.canonicalFile)
     }
 }

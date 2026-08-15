@@ -14,6 +14,8 @@ class AppearanceModelTest {
         assertEquals(LibraryLayoutMode.Grid, LibraryLayoutMode.fromId("grid"))
         assertEquals(LibraryLayoutMode.Samsung, LibraryLayoutMode.fromId(null))
         assertEquals(NotePreviewMode.TitleOnly, NotePreviewMode.fromId("title_only"))
-        assertEquals(NotePreviewMode.Thumbnail, NotePreviewMode.fromId("unknown"))
+        assertEquals(NotePreviewMode.Summary, NotePreviewMode.fromId("summary"))
+        assertEquals(NotePreviewMode.RenderedPage, NotePreviewMode.fromId("thumbnail"))
+        assertEquals(NotePreviewMode.RenderedPage, NotePreviewMode.fromId("unknown"))
     }
 }

@@ -3,7 +3,6 @@ package com.mlevngr.inknote.ui
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -30,7 +29,6 @@ import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import java.io.Closeable
-import java.io.File
 import java.util.concurrent.Executors
 
 class NoteLibraryAdapter(
@@ -40,12 +38,18 @@ class NoteLibraryAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
     private var items: List<LibraryItem> = emptyList()
     private var layoutMode = LibraryLayoutMode.Samsung
-    private var previewMode = NotePreviewMode.Thumbnail
-    private val imageExecutor = Executors.newFixedThreadPool(2)
+    private var previewMode = NotePreviewMode.RenderedPage
+    private val thumbnailExecutor = Executors.newFixedThreadPool(2)
     private val main = Handler(Looper.getMainLooper())
     private val imageCache = object : LruCache<String, Bitmap>(12 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
+    private val thumbnailRenderer = NotePageThumbnailRenderer(
+        pageColor = color(R.attr.inkNoteEditorBackground),
+        textColor = color(R.attr.inkNoteTextPrimary),
+        secondaryTextColor = color(R.attr.inkNoteTextSecondary),
+        accentColor = color(androidx.appcompat.R.attr.colorPrimary)
+    )
 
     fun submit(
         entries: List<NoteLibrary.Entry>,
@@ -118,7 +122,7 @@ class NoteLibraryAdapter(
     }
 
     override fun close() {
-        imageExecutor.shutdownNow()
+        thumbnailExecutor.shutdownNow()
         imageCache.evictAll()
     }
 
@@ -189,45 +193,38 @@ class NoteLibraryAdapter(
         DateUtils.MINUTE_IN_MILLIS
     )
 
-    private fun loadImage(file: File?, imageView: ImageView, fallback: Int) {
-        imageView.tag = file?.absolutePath
+    private fun loadPageThumbnail(entry: NoteLibrary.Entry, imageView: ImageView, width: Int, height: Int) {
+        val key = "${entry.relativePath}:${entry.modifiedAt}:$width:$height:${thumbnailThemeKey()}"
+        imageView.tag = key
         imageView.setImageDrawable(null)
-        if (file == null || previewMode == NotePreviewMode.TitleOnly) {
-            imageView.scaleType = ImageView.ScaleType.CENTER
-            imageView.setImageResource(fallback)
-            imageView.setColorFilter(color(androidx.appcompat.R.attr.colorPrimary))
-            return
-        }
-        val key = file.absolutePath
         imageCache.get(key)?.let {
             imageView.clearColorFilter()
-            imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+            imageView.scaleType = ImageView.ScaleType.FIT_XY
             imageView.setImageBitmap(it)
             return
         }
         imageView.scaleType = ImageView.ScaleType.CENTER
-        imageView.setImageResource(fallback)
+        imageView.setImageResource(R.drawable.ic_note_24)
         imageView.setColorFilter(color(androidx.appcompat.R.attr.colorPrimary))
-        imageExecutor.execute {
-            val bitmap = decodeSampled(file, dp(360), dp(220)) ?: return@execute
+        thumbnailExecutor.execute {
+            val bitmap = thumbnailRenderer.render(entry, width, height)
             imageCache.put(key, bitmap)
             main.post {
                 if (imageView.tag == key) {
                     imageView.clearColorFilter()
-                    imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                    imageView.scaleType = ImageView.ScaleType.FIT_XY
                     imageView.setImageBitmap(bitmap)
                 }
             }
         }
     }
 
-    private fun decodeSampled(file: File, width: Int, height: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        var sample = 1
-        while (bounds.outWidth / sample > width * 2 || bounds.outHeight / sample > height * 2) sample *= 2
-        return BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
-    }
+    private fun thumbnailThemeKey(): String = listOf(
+        color(R.attr.inkNoteEditorBackground),
+        color(R.attr.inkNoteTextPrimary),
+        color(R.attr.inkNoteTextSecondary),
+        color(androidx.appcompat.R.attr.colorPrimary)
+    ).joinToString(":")
 
     private fun color(attribute: Int): Int = ThemeColors.resolve(context, attribute)
     private fun dp(value: Int): Int = (value * context.resources.displayMetrics.density).toInt()
@@ -264,13 +261,16 @@ class NoteLibraryAdapter(
             val isFolder = entry.type == NoteLibrary.EntryType.Folder
             accent.visibility = if (isFolder) View.VISIBLE else View.INVISIBLE
             accent.background = rounded(if (isFolder) folderColor(entry.folderColor) else Color.TRANSPARENT, 3f)
-            subtitle.text = if (isFolder) context.resources.getQuantityString(
-                R.plurals.folder_item_count, entry.childCount, entry.childCount
-            ) else if (previewMode == NotePreviewMode.Thumbnail && entry.preview.excerpt.isNotBlank()) {
-                entry.preview.excerpt
-            } else relativeTime(entry)
+            subtitle.text = when {
+                isFolder -> context.resources.getQuantityString(
+                    R.plurals.folder_item_count, entry.childCount, entry.childCount
+                )
+                previewMode == NotePreviewMode.Summary && entry.preview.excerpt.isNotBlank() ->
+                    entry.preview.excerpt
+                else -> relativeTime(entry)
+            }
             subtitle.visibility = if (!isFolder && previewMode == NotePreviewMode.TitleOnly) View.GONE else View.VISIBLE
-            if (previewMode == NotePreviewMode.TitleOnly && !isFolder) {
+            if (!isFolder && previewMode != NotePreviewMode.RenderedPage) {
                 preview.visibility = View.GONE
             } else {
                 preview.visibility = View.VISIBLE
@@ -278,7 +278,7 @@ class NoteLibraryAdapter(
                     preview.scaleType = ImageView.ScaleType.CENTER
                     preview.setImageResource(R.drawable.ic_folder_24)
                     preview.setColorFilter(folderColor(entry.folderColor))
-                } else loadImage(entry.previewImage, preview, R.drawable.ic_note_24)
+                } else loadPageThumbnail(entry, preview, dp(58), dp(58))
             }
             bindActions(itemView, menu, entry)
         }
@@ -343,9 +343,30 @@ class NoteLibraryAdapter(
 
         fun bind(entry: NoteLibrary.Entry) {
             title.text = entry.name
-            subtitle.text = if (entry.preview.excerpt.isNotBlank()) entry.preview.excerpt else relativeTime(entry)
+            subtitle.text = when {
+                previewMode == NotePreviewMode.Summary && entry.preview.excerpt.isNotBlank() ->
+                    entry.preview.excerpt
+                else -> relativeTime(entry)
+            }
             subtitle.visibility = if (previewMode == NotePreviewMode.TitleOnly) View.GONE else View.VISIBLE
-            loadImage(entry.previewImage, image, R.drawable.ic_note_24)
+            subtitle.maxLines = if (previewMode == NotePreviewMode.Summary) 6 else 1
+            image.visibility = if (previewMode == NotePreviewMode.RenderedPage) View.VISIBLE else View.GONE
+            if (previewMode == NotePreviewMode.RenderedPage) {
+                loadPageThumbnail(
+                    entry,
+                    image,
+                    (context.resources.displayMetrics.widthPixels - dp(48)) / 2,
+                    dp(142)
+                )
+            }
+            (itemView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                params.height = dp(when (previewMode) {
+                    NotePreviewMode.RenderedPage -> 238
+                    NotePreviewMode.Summary -> 170
+                    NotePreviewMode.TitleOnly -> 96
+                })
+                itemView.layoutParams = params
+            }
             bindActions(itemView, menu, entry)
         }
     }

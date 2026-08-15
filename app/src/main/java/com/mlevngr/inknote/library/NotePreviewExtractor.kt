@@ -5,18 +5,16 @@ import com.mlevngr.inknote.markdown.PreviewBlock
 
 data class NotePreview(
     val excerpt: String,
-    val imageRelativePath: String?
+    val renderSource: String = ""
 )
 
 object NotePreviewExtractor {
     private const val MAX_EXCERPT = 120
 
     fun extract(markdown: String): NotePreview {
-        var firstImage: String? = null
         val plainText = buildString {
             MarkdownAssetParser.parse(markdown).forEach { block ->
                 when (block) {
-                    is PreviewBlock.Image -> if (firstImage == null) firstImage = block.relativePath
                     is PreviewBlock.Markdown -> appendMarkdownText(block.source)
                     else -> Unit
                 }
@@ -25,7 +23,7 @@ object NotePreviewExtractor {
 
         return NotePreview(
             excerpt = plainText.take(MAX_EXCERPT),
-            imageRelativePath = firstImage
+            renderSource = markdown.take(MAX_RENDER_SOURCE)
         )
     }
 
@@ -43,4 +41,6 @@ object NotePreviewExtractor {
             }
         }
     }
+
+    private const val MAX_RENDER_SOURCE = 8_192
 }
