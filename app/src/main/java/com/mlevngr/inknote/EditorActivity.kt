@@ -142,10 +142,6 @@ class EditorActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@EditorActivity)
             adapter = noteAdapter
             itemAnimator = null
-            setOnLongClickListener {
-                showPasteAt(null)
-                true
-            }
         }
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
             it.setOnClickListener { toggleMode() }
@@ -413,10 +409,18 @@ class EditorActivity : AppCompatActivity() {
     private fun stageAssetTransfer(lineIndex: Int, file: File, label: String, move: Boolean) {
         if (lineIndex !in 0 until document.size) return
         val source = document[lineIndex]
-        pendingAssetTransfer = AssetTransfer(source, lineIndex, move)
-        getSystemService<ClipboardManager>()?.setPrimaryClip(
-            ClipData.newPlainText(label.ifBlank { file.name }, source)
-        )
+        val assetPath = runCatching {
+            file.canonicalFile.relativeTo(workspace.root.canonicalFile).invariantSeparatorsPath
+        }.getOrElse { file.name }
+        pendingAssetTransfer = AssetTransfer(source, lineIndex, assetPath, move)
+        val clipboard = getSystemService<ClipboardManager>()
+        if (move) {
+            if (clipboardText() == source) clipboard?.clearPrimaryClip()
+        } else {
+            clipboard?.setPrimaryClip(
+                ClipData.newPlainText(label.ifBlank { file.name }, source)
+            )
+        }
         Toast.makeText(
             this,
             if (move) R.string.asset_ready_to_move else R.string.asset_copied,
@@ -516,9 +520,12 @@ class EditorActivity : AppCompatActivity() {
 
     private fun locateTransferSource(transfer: AssetTransfer): Int {
         if (transfer.originalLine in 0 until document.size &&
-            document[transfer.originalLine] == transfer.source
+            transfer.assetPath in document[transfer.originalLine]
         ) return transfer.originalLine
-        return document.snapshot().indexOf(transfer.source)
+        val pathMatches = document.snapshot().mapIndexedNotNull { index, line ->
+            index.takeIf { transfer.assetPath in line }
+        }
+        return pathMatches.singleOrNull() ?: document.snapshot().indexOf(transfer.source)
     }
 
     private fun clipboardText(): String? {
@@ -583,6 +590,7 @@ class EditorActivity : AppCompatActivity() {
     private data class AssetTransfer(
         val source: String,
         val originalLine: Int,
+        val assetPath: String,
         val move: Boolean
     )
 

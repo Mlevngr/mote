@@ -1,21 +1,22 @@
 package com.mlevngr.inknote.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.GestureDetector
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -173,13 +174,20 @@ class HybridNoteAdapter(
             is HybridRow.Editor -> bindEditor(holder as EditorHolder, row)
             is HybridRow.Rendered -> {
                 val activationListener = activationListener(row.lineIndex)
-                holder.itemView.setOnClickListener(activationListener)
+                if (editing) {
+                    holder.itemView.setOnTouchListener(null)
+                    holder.itemView.setOnClickListener(activationListener)
+                } else {
+                    holder.itemView.setOnClickListener(null)
+                    holder.itemView.setOnTouchListener(
+                        doubleTapListener { onPreviewDoubleTap(row.lineIndex) }
+                    )
+                }
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
                         holder as TextHolder
                         val blank = preview.source == "\u00a0"
                         holder.text.setTextIsSelectable(!editing && !blank)
-                        holder.text.setOnClickListener(activationListener)
                         val pasteListener = if (blank) {
                             View.OnLongClickListener { onPasteAt(row.lineIndex); true }
                         } else null
@@ -239,11 +247,14 @@ class HybridNoteAdapter(
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun bindEndZone(holder: TextHolder) {
-        val gate = DoubleTapGate(ViewConfiguration.getDoubleTapTimeout().toLong())
-        holder.text.setOnClickListener {
-            if (gate.registerTap(SystemClock.uptimeMillis())) onAppendAtEnd()
-        }
+        val hint = context.getString(R.string.document_end_hint)
+        holder.text.text = if (editing) "" else hint
+        holder.text.contentDescription = if (editing) null else hint
+        holder.text.minHeight = dp(if (editing) 64 else 112)
+        holder.text.setOnClickListener(null)
+        holder.text.setOnTouchListener(doubleTapListener(onAppendAtEnd))
         holder.text.setOnLongClickListener {
             onPasteAt(null)
             true
@@ -251,17 +262,29 @@ class HybridNoteAdapter(
     }
 
     private fun activationListener(lineIndex: Int): View.OnClickListener {
-        if (editing) return View.OnClickListener { onActivate(lineIndex) }
+        return View.OnClickListener { onActivate(lineIndex) }
+    }
 
-        val gate = DoubleTapGate(ViewConfiguration.getDoubleTapTimeout().toLong())
-        return View.OnClickListener {
-            if (gate.registerTap(SystemClock.uptimeMillis())) onPreviewDoubleTap(lineIndex)
+    @SuppressLint("ClickableViewAccessibility")
+    private fun doubleTapListener(action: () -> Unit): View.OnTouchListener {
+        val detector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent): Boolean = true
+
+            override fun onDoubleTap(event: MotionEvent): Boolean {
+                action()
+                return true
+            }
+        })
+        return View.OnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            false
         }
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnLongClickListener(null)
+        holder.itemView.setOnTouchListener(null)
         if (holder is EditorHolder) holder.detach()
         if (holder is AssetHolder) {
             holder.caption.setOnClickListener(null)
