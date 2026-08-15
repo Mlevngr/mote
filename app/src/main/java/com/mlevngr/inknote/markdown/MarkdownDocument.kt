@@ -28,6 +28,14 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return index + 1
     }
 
+    fun renumberOrderedListAt(index: Int): Boolean {
+        val updated = MarkdownEditing.renumberOrderedList(lines, index)
+        if (updated === lines || updated == lines) return false
+        lines.clear()
+        lines.addAll(updated)
+        return true
+    }
+
     /** Joins this line into the previous line and returns the new cursor position. */
     fun mergeWithPrevious(index: Int): Int? {
         if (index !in 1 until lines.size) return null

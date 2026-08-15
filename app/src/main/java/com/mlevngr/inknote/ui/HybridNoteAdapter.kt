@@ -75,6 +75,7 @@ class HybridNoteAdapter(
     private var assetPastePending = false
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
+    private var focusSelectionStart: Int? = null
     private var editing = false
     private var activeEditor: LineEditText? = null
     private var activeEditorLine: Int? = null
@@ -86,7 +87,8 @@ class HybridNoteAdapter(
         newRows: List<HybridRow>,
         editing: Boolean,
         focusLine: Int? = null,
-        focusCursor: Int? = null
+        focusCursor: Int? = null,
+        focusSelectionStart: Int? = null
     ) {
         allRows = newRows
         val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetKey).toSet()
@@ -94,6 +96,7 @@ class HybridNoteAdapter(
         this.editing = editing
         this.focusLine = focusLine
         this.focusCursor = focusCursor
+        this.focusSelectionStart = focusSelectionStart
         if (!editing) pendingEdit = null
         rebuildVisibleRows()
         notifyDataSetChanged()
@@ -119,6 +122,18 @@ class HybridNoteAdapter(
             return
         }
         applyEdit(editor, transform)
+    }
+
+    fun activeEditState(lineIndex: Int): MarkdownEditResult? {
+        val editor = activeEditor?.takeIf {
+            it.isAttachedToWindow && activeEditorLine == lineIndex
+        } ?: return null
+        val source = editor.text?.toString().orEmpty()
+        return MarkdownEditResult(
+            source = source,
+            selectionStart = editor.selectionStart.coerceIn(0, source.length),
+            selectionEnd = editor.selectionEnd.coerceIn(0, source.length)
+        )
     }
 
     private fun applyEdit(
@@ -372,13 +387,15 @@ class HybridNoteAdapter(
         if (focusLine == row.lineIndex) {
             focusLine = null
             val cursor = focusCursor
+            val selectionStart = focusSelectionStart
             focusCursor = null
+            focusSelectionStart = null
             holder.editor.post {
                 holder.editor.requestFocus()
-                holder.editor.setSelection(
-                    (cursor ?: holder.editor.text?.length ?: 0)
-                        .coerceIn(0, holder.editor.text?.length ?: 0)
-                )
+                val end = (cursor ?: holder.editor.text?.length ?: 0)
+                    .coerceIn(0, holder.editor.text?.length ?: 0)
+                val start = (selectionStart ?: end).coerceIn(0, end)
+                holder.editor.setSelection(start, end)
                 context.getSystemService<InputMethodManager>()
                     ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
             }

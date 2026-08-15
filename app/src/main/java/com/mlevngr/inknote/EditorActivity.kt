@@ -258,7 +258,7 @@ class EditorActivity : AppCompatActivity() {
             applyBlockStyle(MarkdownBlockStyle.Bullet)
         }
         findViewById<View>(R.id.markdown_numbered_list).setOnClickListener {
-            applyBlockStyle(MarkdownBlockStyle.Ordered)
+            toggleOrderedList()
         }
         findViewById<View>(R.id.markdown_quote).setOnClickListener {
             applyBlockStyle(MarkdownBlockStyle.Quote)
@@ -306,6 +306,42 @@ class EditorActivity : AppCompatActivity() {
         applyMarkdownEdit { source, start, end ->
             MarkdownEditing.toggleBlock(source, start, end, style)
         }
+    }
+
+    private fun toggleOrderedList() {
+        val line = activeLine ?: return
+        val current = noteAdapter.activeEditState(line) ?: MarkdownEditResult(
+            source = document[line],
+            selectionStart = document[line].length,
+            selectionEnd = document[line].length
+        )
+        val toggled = MarkdownEditing.toggleBlock(
+            current.source,
+            current.selectionStart,
+            current.selectionEnd,
+            MarkdownBlockStyle.Ordered
+        )
+        document.update(line, toggled.source)
+
+        val selection = if (MarkdownEditing.isOrderedLine(toggled.source)) {
+            document.renumberOrderedListAt(line)
+            MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+                toggled.source,
+                document[line],
+                toggled.selectionStart,
+                toggled.selectionEnd
+            )
+        } else {
+            document.renumberOrderedListAt(line - 1)
+            document.renumberOrderedListAt(line + 1)
+            toggled
+        }
+        refreshRows(
+            requestFocus = true,
+            cursorPosition = selection.selectionEnd,
+            selectionStart = selection.selectionStart
+        )
+        scheduleSave()
     }
 
     private fun applyMarkdownEdit(
@@ -375,10 +411,19 @@ class EditorActivity : AppCompatActivity() {
 
     private fun splitLine(index: Int, cursor: Int) {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return
-        activeLine = document.splitLine(index, cursor)
+        val orderedSplit = MarkdownEditing.splitOrderedLine(document[index], cursor)
+        val cursorPosition = if (orderedSplit == null) {
+            activeLine = document.splitLine(index, cursor)
+            0
+        } else {
+            document.replaceLine(index, listOf(orderedSplit.currentLine, orderedSplit.nextLine))
+            activeLine = index + 1
+            document.renumberOrderedListAt(index + 1)
+            MarkdownEditing.orderedPrefixLength(document[index + 1]) ?: 0
+        }
         lastActiveLine = activeLine ?: index
         updateMarkdownToolbar()
-        refreshRows(requestFocus = true, cursorPosition = 0)
+        refreshRows(requestFocus = true, cursorPosition = cursorPosition)
         scheduleSave()
     }
 
@@ -422,7 +467,11 @@ class EditorActivity : AppCompatActivity() {
         scheduleSave()
     }
 
-    private fun refreshRows(requestFocus: Boolean = false, cursorPosition: Int? = null) {
+    private fun refreshRows(
+        requestFocus: Boolean = false,
+        cursorPosition: Int? = null,
+        selectionStart: Int? = null
+    ) {
         val revision = renderRevision.incrementAndGet()
         val lines = document.snapshot()
         val active = activeLine
@@ -435,7 +484,8 @@ class EditorActivity : AppCompatActivity() {
                         rows,
                         editing,
                         active.takeIf { requestFocus },
-                        cursorPosition
+                        cursorPosition,
+                        selectionStart
                     )
                     if (editing) ensureActiveEditorVisible()
                 }

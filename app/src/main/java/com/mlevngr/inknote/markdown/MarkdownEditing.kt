@@ -9,6 +9,11 @@ data class MarkdownEditResult(
     val selectionEnd: Int
 )
 
+data class OrderedListSplit(
+    val currentLine: String,
+    val nextLine: String
+)
+
 enum class MarkdownBlockStyle(val prefix: String) {
     Task("- [ ] "),
     Bullet("- "),
@@ -21,6 +26,7 @@ object MarkdownEditing {
     private val taskPrefix = Regex("^[-+*]\\s+\\[[ xX]]\\s+")
     private val bulletPrefix = Regex("^[-+*]\\s+")
     private val orderedPrefix = Regex("^\\d+[.)]\\s+")
+    private val orderedLine = Regex("^([ \\t]*)(\\d+)([.)])(\\s+)(.*)$")
     private val quotePrefix = Regex("^>\\s+")
 
     fun bold(source: String, selectionStart: Int, selectionEnd: Int): MarkdownEditResult =
@@ -73,6 +79,70 @@ object MarkdownEditing {
     fun headingLevel(source: String): Int {
         val match = headingPrefix.find(source.substring(prefixLocation(source))) ?: return 0
         return match.value.takeWhile { it == '#' }.length
+    }
+
+    fun isOrderedLine(source: String): Boolean = parseOrderedLine(source) != null
+
+    fun orderedPrefixLength(source: String): Int? = parseOrderedLine(source)?.prefixLength
+
+    fun splitOrderedLine(source: String, cursor: Int): OrderedListSplit? {
+        val ordered = parseOrderedLine(source) ?: return null
+        val splitAt = cursor.coerceIn(ordered.prefixLength, source.length)
+        val current = source.substring(0, splitAt)
+        val remainder = source.substring(splitAt).removePrefix(" ")
+        val nextNumber = ordered.number + 1
+        return OrderedListSplit(
+            currentLine = current,
+            nextLine = "${ordered.indent}$nextNumber${ordered.delimiter} $remainder"
+        )
+    }
+
+    /**
+     * Renumbers the contiguous ordered-list run containing [anchor]. A different indentation
+     * level or any non-list line is a boundary. The first item's number is preserved so lists
+     * intentionally starting above one keep their meaning.
+     */
+    fun renumberOrderedList(lines: List<String>, anchor: Int): List<String> {
+        if (anchor !in lines.indices) return lines
+        val anchored = parseOrderedLine(lines[anchor]) ?: return lines
+        var start = anchor
+        while (start > 0 && parseOrderedLine(lines[start - 1])?.indent == anchored.indent) start--
+        var end = anchor
+        while (end < lines.lastIndex && parseOrderedLine(lines[end + 1])?.indent == anchored.indent) end++
+
+        val firstNumber = parseOrderedLine(lines[start])?.number ?: return lines
+        var changed = false
+        val updated = lines.toMutableList()
+        for (index in start..end) {
+            val item = parseOrderedLine(lines[index]) ?: break
+            val normalized = "${item.indent}${firstNumber + index - start}${item.delimiter} ${item.content}"
+            if (normalized != lines[index]) {
+                updated[index] = normalized
+                changed = true
+            }
+        }
+        return if (changed) updated else lines
+    }
+
+    fun adjustSelectionAfterOrderedRenumber(
+        before: String,
+        after: String,
+        selectionStart: Int,
+        selectionEnd: Int
+    ): MarkdownEditResult {
+        val oldLine = parseOrderedLine(before)
+            ?: return unchanged(after, selectionStart, selectionEnd)
+        val newLine = parseOrderedLine(after)
+            ?: return unchanged(after, selectionStart, selectionEnd)
+        fun adjusted(position: Int): Int {
+            val safe = position.coerceIn(0, before.length)
+            return when {
+                safe < oldLine.indent.length -> safe
+                safe <= oldLine.prefixLength -> newLine.prefixLength
+                else -> safe - oldLine.prefixLength + newLine.prefixLength
+            }.coerceIn(0, after.length)
+        }
+        return MarkdownEditResult(after, adjusted(selectionStart), adjusted(selectionEnd))
     }
 
     fun link(
@@ -174,8 +244,28 @@ object MarkdownEditing {
         selectionEnd.coerceIn(0, source.length)
     )
 
+    private fun parseOrderedLine(source: String): OrderedLine? {
+        val match = orderedLine.matchEntire(source) ?: return null
+        val number = match.groupValues[2].toIntOrNull() ?: return null
+        return OrderedLine(
+            indent = match.groupValues[1],
+            number = number,
+            delimiter = match.groupValues[3],
+            content = match.groupValues[5],
+            prefixLength = match.groupValues.take(5).drop(1).sumOf(String::length)
+        )
+    }
+
     private data class ExistingPrefix(
         val value: String,
         val style: MarkdownBlockStyle?
+    )
+
+    private data class OrderedLine(
+        val indent: String,
+        val number: Int,
+        val delimiter: String,
+        val content: String,
+        val prefixLength: Int
     )
 }

@@ -74,6 +74,84 @@ class MarkdownEditingTest {
         assertEdit(result, "[链接文字](https://)", 1, 5)
     }
 
+    @Test fun enterAfterOrderedItemContinuesWithTheNextNumber() {
+        val result = MarkdownEditing.splitOrderedLine("1. first item", 13)
+
+        assertEquals("1. first item", result?.currentLine)
+        assertEquals("2. ", result?.nextLine)
+    }
+
+    @Test fun enterInTheMiddleMovesTheRemainderIntoTheNewOrderedItem() {
+        val result = MarkdownEditing.splitOrderedLine("8) first second", 8)
+
+        assertEquals("8) first", result?.currentLine)
+        assertEquals("9) second", result?.nextLine)
+    }
+
+    @Test fun orderedSplitNeverPlacesTheCursorInsideItsPrefix() {
+        val result = MarkdownEditing.splitOrderedLine("12. item", 1)
+
+        assertEquals("12. ", result?.currentLine)
+        assertEquals("13. item", result?.nextLine)
+    }
+
+    @Test fun renumbersAnEntireContiguousOrderedRun() {
+        val result = MarkdownEditing.renumberOrderedList(
+            listOf("1. Alpha", "7. Beta", "42. Gamma"),
+            anchor = 1
+        )
+
+        assertEquals(listOf("1. Alpha", "2. Beta", "3. Gamma"), result)
+    }
+
+    @Test fun insertedMiddleItemBridgesAndRenumbersBothSides() {
+        val result = MarkdownEditing.renumberOrderedList(
+            listOf("1. Alpha", "1. Inserted", "2. Beta", "3. Gamma"),
+            anchor = 1
+        )
+
+        assertEquals(listOf("1. Alpha", "2. Inserted", "3. Beta", "4. Gamma"), result)
+    }
+
+    @Test fun renumberingPreservesAnIntentionalStartingNumberAndDelimiter() {
+        val result = MarkdownEditing.renumberOrderedList(
+            listOf("5) Alpha", "20) Beta", "21) Gamma"),
+            anchor = 2
+        )
+
+        assertEquals(listOf("5) Alpha", "6) Beta", "7) Gamma"), result)
+    }
+
+    @Test fun renumberingStopsAtPlainTextAndDifferentIndentation() {
+        val source = listOf("1. Parent", "  1. Child", "9. Parent", "plain", "4. Other")
+
+        assertEquals(source, MarkdownEditing.renumberOrderedList(source, anchor = 0))
+        assertEquals(source, MarkdownEditing.renumberOrderedList(source, anchor = 2))
+        assertEquals(source, MarkdownEditing.renumberOrderedList(source, anchor = 4))
+    }
+
+    @Test fun cursorTracksAChangingOrderedPrefixWidth() {
+        val result = MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+            before = "9. item",
+            after = "10. item",
+            selectionStart = 7,
+            selectionEnd = 7
+        )
+
+        assertEdit(result, "10. item", 8, 8)
+    }
+
+    @Test fun cursorInsideARenumberedMarkerMovesBehindTheMarker() {
+        val result = MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+            before = "  9. item",
+            after = "  10. item",
+            selectionStart = 3,
+            selectionEnd = 3
+        )
+
+        assertEdit(result, "  10. item", 6, 6)
+    }
+
     private fun assertEdit(
         result: MarkdownEditResult,
         source: String,

@@ -30,6 +30,13 @@ class MarkdownDocumentTest {
         assertEquals(listOf("Hello", " world"), document.snapshot())
     }
 
+    @Test fun renumbersTheOrderedSequenceAroundAnInsertedLine() {
+        val document = MarkdownDocument.parse("1. First\n1. Inserted\n2. Second\n3. Third")
+
+        assertEquals(true, document.renumberOrderedListAt(1))
+        assertEquals("1. First\n2. Inserted\n3. Second\n4. Third", document.markdown())
+    }
+
     @Test fun backspaceAtLineStartMergesWithPreviousLine() {
         val document = MarkdownDocument.parse("Hello\n world")
         assertEquals(5, document.mergeWithPrevious(1))
