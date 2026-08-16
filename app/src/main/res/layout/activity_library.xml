@@ -10,31 +10,42 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/library_toolbar"
+        <LinearLayout
+            android:id="@+id/library_app_bar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/inkNoteToolbarBackground"
-            app:contentInsetStart="0dp"
-            app:contentInsetStartWithNavigation="0dp"
-            app:titleMarginStart="8dp"
-            app:titleTextColor="?attr/inkNoteTextPrimary">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/open_drawer"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:layout_gravity="start|center_vertical"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/open_navigation"
                 android:padding="12dp"
                 android:src="@drawable/ic_menu_24"
                 app:tint="?attr/inkNoteIconColor" />
 
+            <TextView
+                android:id="@+id/library_title"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="4dp"
+                android:text="@string/app_name"
+                android:textColor="?attr/inkNoteTextPrimary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_gravity="end"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -69,7 +80,7 @@
                     android:src="@drawable/ic_note_add_24"
                     app:tint="?attr/inkNoteIconColor" />
             </LinearLayout>
-        </com.google.android.material.appbar.MaterialToolbar>
+        </LinearLayout>
 
         <FrameLayout
             android:layout_width="match_parent"

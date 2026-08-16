@@ -23,7 +23,6 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
@@ -49,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: NoteLibraryAdapter
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
-    private lateinit var toolbar: MaterialToolbar
+    private lateinit var libraryTitle: TextView
     private lateinit var drawer: DrawerLayout
     private lateinit var navigateUpButton: AppCompatImageButton
     private lateinit var emptyView: TextView
@@ -74,7 +73,7 @@ class MainActivity : AppCompatActivity() {
                 ?.let { FolderLocation(it.toList()) }
         }.getOrNull() ?: FolderLocation.Root
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
-        toolbar = findViewById(R.id.library_toolbar)
+        libraryTitle = findViewById(R.id.library_title)
         drawer = findViewById(R.id.library_root)
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
         findViewById<AppCompatImageButton>(R.id.open_drawer).setOnClickListener {
@@ -159,7 +158,7 @@ class MainActivity : AppCompatActivity() {
                 adapter.submit(entries, appearance.libraryLayout, appearance.notePreview)
                 emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
                 else android.view.View.GONE
-                toolbar.title = currentFolder.title ?: getString(R.string.app_name)
+                libraryTitle.text = currentFolder.title ?: getString(R.string.app_name)
                 navigateUpButton.visibility = if (currentFolder.names.isEmpty()) {
                     android.view.View.GONE
                 } else android.view.View.VISIBLE
