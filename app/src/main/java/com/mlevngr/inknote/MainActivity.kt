@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var toolbar: MaterialToolbar
     private lateinit var drawer: DrawerLayout
+    private lateinit var navigateUpButton: AppCompatImageButton
     private lateinit var emptyView: TextView
     private lateinit var recyclerView: RecyclerView
     private var currentFolder = FolderLocation.Root
@@ -75,6 +76,9 @@ class MainActivity : AppCompatActivity() {
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
         drawer = findViewById(R.id.library_root)
+        navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
+            button.setOnClickListener { navigateUp() }
+        }
         emptyView = findViewById(R.id.empty_library)
         recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
@@ -101,10 +105,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<AppCompatImageButton>(R.id.create_note).setOnClickListener {
             showCreateDialog(CreateType.Note)
         }
-        toolbar.setNavigationOnClickListener {
-            if (currentFolder.names.isEmpty()) drawer.openDrawer(GravityCompat.START)
-            else navigateUp()
-        }
+        toolbar.setNavigationOnClickListener { drawer.openDrawer(GravityCompat.START) }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (drawer.isDrawerOpen(GravityCompat.START)) {
@@ -156,13 +157,9 @@ class MainActivity : AppCompatActivity() {
                 emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
                 else android.view.View.GONE
                 toolbar.title = currentFolder.title ?: getString(R.string.app_name)
-                if (currentFolder.names.isEmpty()) {
-                    toolbar.setNavigationIcon(R.drawable.ic_menu_24)
-                    toolbar.navigationContentDescription = getString(R.string.open_navigation)
-                } else {
-                    toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
-                    toolbar.navigationContentDescription = getString(R.string.go_up)
-                }
+                navigateUpButton.visibility = if (currentFolder.names.isEmpty()) {
+                    android.view.View.GONE
+                } else android.view.View.VISIBLE
             }
         }
     }

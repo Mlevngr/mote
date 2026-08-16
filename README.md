@@ -4,9 +4,9 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（插件平台与主页侧边栏）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r8/Mote-0.8.0-r8.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（插件平台与主页侧边栏）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r9/Mote-0.8.0-r9.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r8/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r9/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -67,7 +67,7 @@ Mote 有清晰的阅读、编辑两种模式：
 
 ## 主题与主页外观
 
-主页左上角打开 Material 侧边栏；外观与布局、WebDAV、插件管理和回收站都集中在侧边栏，顶部只保留新建文件夹与新建笔记：
+主页左上角的三横线入口始终打开 Material 侧边栏，进入子文件夹后也不会被返回按钮替换；外观与布局、WebDAV、插件管理和回收站都集中在侧边栏：
 
 - 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题。主题选择器使用每套主题自己的强调色名称和三色预览，不再显示成统一的灰色文字列表。各页面标题栏与正文使用完全相同的主题背景，不再额外增加灰色工具栏色块；Catppuccin 使用 Latte/Mocha 官方色阶，Tokyo Night 使用其官方昼夜前景、背景与蓝色强调色，Minimal 保持可定制主题的中性低干扰层级。
 - Samsung 风格默认将文件夹以双列卡片置于上方，笔记在下方保持易扫读的列表；也可切换为紧凑列表或双列缩略图网格。
