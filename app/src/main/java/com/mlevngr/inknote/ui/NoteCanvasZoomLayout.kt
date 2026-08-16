@@ -7,19 +7,20 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.core.view.isEmpty
 import kotlin.math.hypot
-import kotlin.math.roundToInt
 
-/** Reflows and scales the complete note surface while leaving app chrome at normal size. */
+/** Geometrically zooms the complete note surface without changing its layout or text size. */
 class NoteCanvasZoomLayout @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : ViewGroup(context, attrs) {
-    private var canvasScale = 1f
+    private var transform = NoteCanvasZoom.Transform()
     private var pinching = false
     private var lastSpan = 0f
+    private var lastFocusX = 0f
+    private var lastFocusY = 0f
     private var reboundAnimator: ValueAnimator? = null
 
-    val currentScale: Float get() = canvasScale
+    val currentScale: Float get() = transform.scale
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -29,11 +30,9 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
             resolveSize(height, heightMeasureSpec)
         )
         if (isEmpty()) return
-        val childWidth = (measuredWidth / canvasScale).roundToInt().coerceAtLeast(1)
-        val childHeight = (measuredHeight / canvasScale).roundToInt().coerceAtLeast(1)
         getChildAt(0).measure(
-            MeasureSpec.makeMeasureSpec(childWidth, MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(childHeight, MeasureSpec.EXACTLY)
+            MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
         )
     }
 
@@ -43,8 +42,13 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
         content.layout(0, 0, content.measuredWidth, content.measuredHeight)
         content.pivotX = 0f
         content.pivotY = 0f
-        content.scaleX = canvasScale
-        content.scaleY = canvasScale
+        applyTransform()
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        transform = NoteCanvasZoom.constrain(transform, width.toFloat(), height.toFloat())
+        applyTransform()
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
@@ -89,12 +93,29 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
         reboundAnimator = null
         pinching = true
         lastSpan = span(event)
+        lastFocusX = focusX(event)
+        lastFocusY = focusY(event)
     }
 
     private fun updatePinch(event: MotionEvent) {
         val nextSpan = span(event)
         if (lastSpan > 0f && nextSpan > 0f) {
-            setCanvasScale(NoteCanvasZoom.update(canvasScale, nextSpan / lastSpan))
+            val nextFocusX = focusX(event)
+            val nextFocusY = focusY(event)
+            setTransform(
+                NoteCanvasZoom.update(
+                    current = transform,
+                    factor = nextSpan / lastSpan,
+                    previousFocusX = lastFocusX,
+                    previousFocusY = lastFocusY,
+                    focusX = nextFocusX,
+                    focusY = nextFocusY,
+                    viewportWidth = width.toFloat(),
+                    viewportHeight = height.toFloat()
+                )
+            )
+            lastFocusX = nextFocusX
+            lastFocusY = nextFocusY
         }
         lastSpan = nextSpan
     }
@@ -103,25 +124,52 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
         if (!pinching) return
         pinching = false
         lastSpan = 0f
-        val settled = NoteCanvasZoom.settle(canvasScale)
-        if (settled == canvasScale) return
-        reboundAnimator = ValueAnimator.ofFloat(canvasScale, settled).apply {
+        val settled = NoteCanvasZoom.settle(transform, width.toFloat(), height.toFloat())
+        if (settled == transform) return
+        val start = transform
+        reboundAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 180L
-            addUpdateListener { setCanvasScale(it.animatedValue as Float) }
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                setTransform(
+                    NoteCanvasZoom.Transform(
+                        scale = lerp(start.scale, settled.scale, progress),
+                        translationX = lerp(start.translationX, settled.translationX, progress),
+                        translationY = lerp(start.translationY, settled.translationY, progress)
+                    )
+                )
+            }
             start()
         }
     }
 
-    private fun setCanvasScale(scale: Float) {
-        if (scale == canvasScale) return
-        canvasScale = scale
-        requestLayout()
+    private fun setTransform(value: NoteCanvasZoom.Transform) {
+        if (value == transform) return
+        transform = value
+        applyTransform()
+    }
+
+    private fun applyTransform() {
+        if (isEmpty()) return
+        getChildAt(0).apply {
+            scaleX = transform.scale
+            scaleY = transform.scale
+            translationX = transform.translationX
+            translationY = transform.translationY
+        }
     }
 
     private fun span(event: MotionEvent): Float {
         if (event.pointerCount < 2) return 0f
         return hypot(event.getX(0) - event.getX(1), event.getY(0) - event.getY(1))
     }
+
+    private fun focusX(event: MotionEvent): Float = (event.getX(0) + event.getX(1)) / 2f
+
+    private fun focusY(event: MotionEvent): Float = (event.getY(0) + event.getY(1)) / 2f
+
+    private fun lerp(start: Float, end: Float, progress: Float): Float =
+        start + (end - start) * progress
 
     override fun generateDefaultLayoutParams(): LayoutParams =
         LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -130,5 +178,4 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
         LayoutParams(context, attrs)
 
     override fun generateLayoutParams(params: LayoutParams): LayoutParams = LayoutParams(params)
-
 }

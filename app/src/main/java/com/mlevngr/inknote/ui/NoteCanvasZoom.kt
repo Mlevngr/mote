@@ -4,8 +4,61 @@ object NoteCanvasZoom {
     const val MIN_GESTURE_SCALE = 0.75f
     const val MAX_SCALE = 2.5f
 
-    fun update(currentScale: Float, factor: Float): Float =
-        (currentScale * factor).coerceIn(MIN_GESTURE_SCALE, MAX_SCALE)
+    data class Transform(
+        val scale: Float = 1f,
+        val translationX: Float = 0f,
+        val translationY: Float = 0f
+    )
 
-    fun settle(scale: Float): Float = if (scale < 1f) 1f else scale
+    fun update(
+        current: Transform,
+        factor: Float,
+        previousFocusX: Float,
+        previousFocusY: Float,
+        focusX: Float,
+        focusY: Float,
+        viewportWidth: Float,
+        viewportHeight: Float
+    ): Transform {
+        val scale = (current.scale * factor).coerceIn(MIN_GESTURE_SCALE, MAX_SCALE)
+        val appliedFactor = scale / current.scale
+        return constrain(
+            Transform(
+                scale = scale,
+                translationX = focusX - (previousFocusX - current.translationX) * appliedFactor,
+                translationY = focusY - (previousFocusY - current.translationY) * appliedFactor
+            ),
+            viewportWidth,
+            viewportHeight
+        )
+    }
+
+    fun settle(
+        transform: Transform,
+        viewportWidth: Float,
+        viewportHeight: Float
+    ): Transform = if (transform.scale < 1f) {
+        Transform()
+    } else {
+        constrain(transform, viewportWidth, viewportHeight)
+    }
+
+    fun constrain(
+        transform: Transform,
+        viewportWidth: Float,
+        viewportHeight: Float
+    ): Transform {
+        if (transform.scale < 1f) {
+            return transform.copy(
+                translationX = viewportWidth * (1f - transform.scale) / 2f,
+                translationY = viewportHeight * (1f - transform.scale) / 2f
+            )
+        }
+        val minimumX = viewportWidth * (1f - transform.scale)
+        val minimumY = viewportHeight * (1f - transform.scale)
+        return transform.copy(
+            translationX = transform.translationX.coerceIn(minimumX, 0f),
+            translationY = transform.translationY.coerceIn(minimumY, 0f)
+        )
+    }
 }
