@@ -20,20 +20,19 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/open_drawer"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_width="92dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:backgroundTint="?attr/colorPrimary"
                 android:contentDescription="@string/open_navigation"
+                android:elevation="6dp"
                 android:minWidth="0dp"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
                 android:text="@string/navigation_menu"
-                android:textColor="?attr/inkNoteTextPrimary"
+                android:textColor="?attr/colorOnPrimary"
+                android:textSize="15sp"
                 android:textStyle="bold"
-                app:icon="@drawable/ic_menu_24"
-                app:iconPadding="4dp"
-                app:iconSize="24dp"
-                app:iconTint="?attr/inkNoteIconColor" />
+                app:cornerRadius="14dp" />
 
             <TextView
                 android:id="@+id/library_title"

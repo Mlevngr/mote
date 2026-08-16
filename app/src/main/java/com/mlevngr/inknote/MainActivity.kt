@@ -77,9 +77,9 @@ class MainActivity : AppCompatActivity() {
         libraryTitle = findViewById(R.id.library_title)
         drawer = findViewById(R.id.library_root)
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        findViewById<View>(R.id.open_drawer).setOnClickListener {
-            drawer.openDrawer(GravityCompat.START)
-        }
+        val openDrawer = View.OnClickListener { drawer.openDrawer(GravityCompat.START) }
+        findViewById<View>(R.id.open_drawer).setOnClickListener(openDrawer)
+        libraryTitle.setOnClickListener(openDrawer)
         navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
             button.setOnClickListener { navigateUp() }
         }
@@ -710,6 +710,6 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val STATE_FOLDER = "current_folder"
         const val NAVIGATION_PREFERENCES = "navigation_ui"
-        const val DRAWER_INTRODUCTION_KEY = "drawer_introduction_build_43"
+        const val DRAWER_INTRODUCTION_KEY = "drawer_introduction_build_44"
     }
 }
