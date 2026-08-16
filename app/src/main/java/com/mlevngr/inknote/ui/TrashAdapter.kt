@@ -14,7 +14,9 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
+import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.appearance.ThemeColors
+import com.mlevngr.inknote.appearance.ThemePalette
 import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import kotlin.math.ceil
@@ -24,6 +26,7 @@ class TrashAdapter(
     private val retentionMillis: () -> Long,
     private val onActions: (NoteLibrary.TrashEntry) -> Unit
 ) : RecyclerView.Adapter<TrashAdapter.Holder>() {
+    private val appTheme = AppearancePreferences(context).theme
     private var entries: List<NoteLibrary.TrashEntry> = emptyList()
 
     fun submit(entries: List<NoteLibrary.TrashEntry>) {
@@ -102,7 +105,7 @@ class TrashAdapter(
     private fun folderColor(folderColor: FolderColor): Int {
         val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
-        return if (night) folderColor.dark else folderColor.light
+        return ThemePalette.folderColor(appTheme, folderColor, night)
     }
 
     private fun selectable(borderless: Boolean) = TypedValue().also {

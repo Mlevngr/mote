@@ -25,7 +25,9 @@ import androidx.recyclerview.widget.DiffUtil
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.appearance.LibraryLayoutMode
 import com.mlevngr.inknote.appearance.NotePreviewMode
+import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.appearance.ThemeColors
+import com.mlevngr.inknote.appearance.ThemePalette
 import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import java.io.Closeable
@@ -36,6 +38,7 @@ class NoteLibraryAdapter(
     private val onClick: (NoteLibrary.Entry) -> Unit,
     private val onMenu: (NoteLibrary.Entry) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Closeable {
+    private val appTheme = AppearancePreferences(context).theme
     private var items: List<LibraryItem> = emptyList()
     private var layoutMode = LibraryLayoutMode.Samsung
     private var previewMode = NotePreviewMode.RenderedPage
@@ -184,7 +187,7 @@ class NoteLibraryAdapter(
     private fun folderColor(color: FolderColor): Int {
         val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
-        return if (night) color.dark else color.light
+        return ThemePalette.folderColor(appTheme, color, night)
     }
 
     private fun relativeTime(entry: NoteLibrary.Entry): CharSequence = DateUtils.getRelativeTimeSpanString(

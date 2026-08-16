@@ -30,6 +30,7 @@ import com.mlevngr.inknote.appearance.AppTheme
 import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.appearance.LibraryLayoutMode
 import com.mlevngr.inknote.appearance.NotePreviewMode
+import com.mlevngr.inknote.appearance.ThemePalette
 import com.mlevngr.inknote.library.FolderColor
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
@@ -184,14 +185,84 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.theme_tokyo_night),
             getString(R.string.theme_minimal)
         )
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.theme_setting)
-            .setSingleChoiceItems(labels, themes.indexOf(appearance.theme)) { dialog, which ->
-                appearance.theme = themes[which]
-                dialog.dismiss()
-                recreate()
+        val night = isNightMode()
+        val surface = ThemeColors.resolve(this, com.google.android.material.R.attr.colorSurfaceContainer)
+        val outline = ThemeColors.resolve(this, com.google.android.material.R.attr.colorOutline)
+        val currentPrimary = ThemeColors.resolve(this, androidx.appcompat.R.attr.colorPrimary)
+        val options = mutableListOf<Pair<MaterialCardView, AppTheme>>()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16.dp, 8.dp, 16.dp, 12.dp)
+        }
+        themes.forEachIndexed { index, theme ->
+            val preview = ThemePalette.preview(theme, night)
+            val selected = theme == appearance.theme
+            val rowContent = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(18.dp, 0, 14.dp, 0)
+                addView(TextView(this@MainActivity).apply {
+                    text = labels[index]
+                    textSize = 16f
+                    setTextColor(preview.accent)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                listOf(preview.background, preview.surface, preview.accent).forEach { color ->
+                    addView(FrameLayout(this@MainActivity).apply {
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(color)
+                            setStroke(1.dp, ColorUtils.setAlphaComponent(outline, 140))
+                        }
+                    }, LinearLayout.LayoutParams(20.dp, 20.dp).apply {
+                        marginStart = 6.dp
+                    })
+                }
+                addView(ImageView(this@MainActivity).apply {
+                    setImageResource(R.drawable.ic_check_24)
+                    imageTintList = ColorStateList.valueOf(currentPrimary)
+                    visibility = if (selected) android.view.View.VISIBLE else android.view.View.INVISIBLE
+                }, LinearLayout.LayoutParams(24.dp, 24.dp).apply {
+                    marginStart = 12.dp
+                })
             }
-            .show()
+            val card = MaterialCardView(this).apply {
+                radius = 14.dp.toFloat()
+                cardElevation = 0f
+                setCardBackgroundColor(surface)
+                strokeWidth = if (selected) 2.dp else 1.dp
+                setStrokeColor(if (selected) currentPrimary else ColorUtils.setAlphaComponent(outline, 110))
+                rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(currentPrimary, 28))
+                isClickable = true
+                isFocusable = true
+                contentDescription = labels[index]
+                addView(rowContent)
+            }
+            content.addView(card, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                60.dp
+            ).apply {
+                topMargin = 4.dp
+                bottomMargin = 4.dp
+            })
+            options += card to theme
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.theme_setting)
+            .setView(content)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        options.forEach { (view, theme) ->
+            view.setOnClickListener {
+                if (theme != appearance.theme) {
+                    appearance.theme = theme
+                    dialog.dismiss()
+                    recreate()
+                } else {
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun showLayoutDialog() {
@@ -425,10 +496,12 @@ class MainActivity : AppCompatActivity() {
         List(childCount) { getChildAt(it) }
 
     private fun folderColorValue(folderColor: FolderColor): Int {
-        val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-            Configuration.UI_MODE_NIGHT_YES
-        return if (night) folderColor.dark else folderColor.light
+        return ThemePalette.folderColor(appearance.theme, folderColor, isNightMode())
     }
+
+    private fun isNightMode(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
 
     private fun showRenameDialog(entry: NoteLibrary.Entry) {
         val input = TextInputEditText(this).apply {
