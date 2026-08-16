@@ -41,7 +41,7 @@
         <item name="android:navigationBarColor">#EFF1F5</item>
         <item name="android:statusBarColor">#EFF1F5</item>
         <item name="inkNoteAppBackground">#EFF1F5</item>
-        <item name="inkNoteToolbarBackground">#DCE0E8</item>
+        <item name="inkNoteToolbarBackground">#EFF1F5</item>
         <item name="inkNoteEditorBackground">#E6E9EF</item>
         <item name="inkNoteEditorBorder">#CCD0DA</item>
         <item name="inkNotePreviewBackground">#EFF1F5</item>
@@ -64,7 +64,7 @@
         <item name="android:navigationBarColor">#E6E7ED</item>
         <item name="android:statusBarColor">#E6E7ED</item>
         <item name="inkNoteAppBackground">#E6E7ED</item>
-        <item name="inkNoteToolbarBackground">#D5D6DB</item>
+        <item name="inkNoteToolbarBackground">#E6E7ED</item>
         <item name="inkNoteEditorBackground">#E6E7ED</item>
         <item name="inkNoteEditorBorder">#B7B9C2</item>
         <item name="inkNotePreviewBackground">#E6E7ED</item>
@@ -87,7 +87,7 @@
         <item name="android:navigationBarColor">#FAFAFA</item>
         <item name="android:statusBarColor">#FFFFFF</item>
         <item name="inkNoteAppBackground">#FAFAFA</item>
-        <item name="inkNoteToolbarBackground">#FFFFFF</item>
+        <item name="inkNoteToolbarBackground">#FAFAFA</item>
         <item name="inkNoteEditorBackground">#FFFFFF</item>
         <item name="inkNoteEditorBorder">#E3E3E3</item>
         <item name="inkNotePreviewBackground">#FAFAFA</item>

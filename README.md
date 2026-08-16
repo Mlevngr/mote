@@ -4,7 +4,7 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.7.11 APK](https://github.com/Mlevngr/note/releases/download/v0.7.11/Mote-0.7.11.apk?download=1)**
+**[直接下载 Mote 0.7.12 APK](https://github.com/Mlevngr/note/releases/download/v0.7.12/Mote-0.7.12.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -67,7 +67,7 @@ Mote 有清晰的阅读、编辑两种模式：
 
 主页右上角的调色板按钮可以即时调整外观，设置会在下次启动时保留：
 
-- 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题。主题选择器使用每套主题自己的强调色名称和三色预览，不再显示成统一的灰色文字列表。Catppuccin 使用 Latte/Mocha 官方色阶，Tokyo Night 使用其官方昼夜前景、背景与蓝色强调色，Minimal 保持可定制主题的中性低干扰层级；每套主题都覆盖明亮/深色下的标题区、编辑面、卡片、图标、对话框和系统栏。
+- 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题。主题选择器使用每套主题自己的强调色名称和三色预览，不再显示成统一的灰色文字列表。各页面标题栏与正文使用完全相同的主题背景，不再额外增加灰色工具栏色块；Catppuccin 使用 Latte/Mocha 官方色阶，Tokyo Night 使用其官方昼夜前景、背景与蓝色强调色，Minimal 保持可定制主题的中性低干扰层级。
 - Samsung 风格默认将文件夹以双列卡片置于上方，笔记在下方保持易扫读的列表；也可切换为紧凑列表或双列缩略图网格。
 - 笔记预览分为三种独立模式：“第一页渲染预览”会生成包含标题、Markdown 样式、图片和 PDF 首页的页面缩小图；“正文摘要”只显示可扫读的文本摘要；“仅显示标题”用于最紧凑的目录。
 - 页面缩略图在后台生成并按笔记修改时间、主题和尺寸缓存，不阻塞目录滚动；旧版“首页图片与摘要”设置会自动迁移到第一页渲染预览。
