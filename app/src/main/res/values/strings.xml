@@ -14,6 +14,7 @@
     <string name="plugin_processing">插件正在处理笔记…</string>
     <string name="plugin_cancel">取消请求</string>
     <string name="plugin_preview">插件修改预览</string>
+    <string name="plugin_run_from_editor">请打开一篇笔记，然后点击右上角的插件按钮运行此插件。</string>
     <string name="plugin_apply">应用修改</string>
     <string name="plugin_settings">插件设置</string>
     <string name="plugin_no_changes">插件没有生成内容变化</string>

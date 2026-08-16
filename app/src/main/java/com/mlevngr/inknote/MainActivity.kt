@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var libraryTitle: TextView
     private lateinit var drawer: HomeDrawerLayout
-    private lateinit var navigateUpButton: AppCompatImageButton
+    private lateinit var navigationButton: AppCompatImageButton
     private lateinit var emptyView: TextView
     private lateinit var folderSection: View
     private lateinit var recyclerView: RecyclerView
@@ -86,11 +86,11 @@ class MainActivity : AppCompatActivity() {
         libraryTitle = findViewById(R.id.library_title)
         drawer = findViewById(R.id.library_root)
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        findViewById<View>(R.id.open_drawer).setOnClickListener {
-            drawer.openDrawer(GravityCompat.START)
-        }
-        navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
-            button.setOnClickListener { navigateUp() }
+        navigationButton = findViewById<AppCompatImageButton>(R.id.open_drawer).also { button ->
+            button.setOnClickListener {
+                if (currentFolder.names.isEmpty()) drawer.openDrawer(GravityCompat.START)
+                else navigateUp()
+            }
         }
         emptyView = findViewById(R.id.empty_library)
         folderSection = findViewById(R.id.folder_section)
@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
             itemAnimator = null
         }
         drawer.excludeOpenSwipeFrom(folderStrip)
+        updateNavigationState()
         recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
             itemAnimator = null
@@ -185,11 +186,20 @@ class MainActivity : AppCompatActivity() {
                 emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
                 else android.view.View.GONE
                 libraryTitle.text = currentFolder.title ?: getString(R.string.app_name)
-                navigateUpButton.visibility = if (currentFolder.names.isEmpty()) {
-                    android.view.View.GONE
-                } else android.view.View.VISIBLE
+                updateNavigationState()
             }
         }
+    }
+
+    private fun updateNavigationState() {
+        val atRoot = currentFolder.names.isEmpty()
+        navigationButton.setImageResource(
+            if (atRoot) R.drawable.ic_menu_24 else R.drawable.ic_arrow_back_24
+        )
+        navigationButton.contentDescription = getString(
+            if (atRoot) R.string.open_navigation else R.string.go_up
+        )
+        drawer.setOpenSwipeEnabled(atRoot)
     }
 
     private fun configureLibraryLayout() {
@@ -211,10 +221,11 @@ class MainActivity : AppCompatActivity() {
      * feature, this makes an incorrectly installed older APK immediately obvious to the user.
      */
     private fun introduceNavigationDrawer() {
+        if (currentFolder.names.isNotEmpty()) return
         val preferences = getSharedPreferences(NAVIGATION_PREFERENCES, MODE_PRIVATE)
         if (preferences.getBoolean(DRAWER_INTRODUCTION_KEY, false)) return
         drawer.post {
-            if (isFinishing || isDestroyed) return@post
+            if (isFinishing || isDestroyed || currentFolder.names.isNotEmpty()) return@post
             drawer.openDrawer(GravityCompat.START)
             preferences.edit().putBoolean(DRAWER_INTRODUCTION_KEY, true).apply()
         }

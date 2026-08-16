@@ -50,17 +50,6 @@
                 android:orientation="horizontal">
 
                 <androidx.appcompat.widget.AppCompatImageButton
-                    android:id="@+id/navigate_up"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/go_up"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_arrow_back_24"
-                    android:visibility="gone"
-                    app:tint="?attr/inkNoteIconColor" />
-
-                <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/create_folder"
                     android:layout_width="48dp"
                     android:layout_height="48dp"

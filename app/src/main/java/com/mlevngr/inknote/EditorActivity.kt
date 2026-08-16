@@ -269,7 +269,6 @@ class EditorActivity : AppCompatActivity() {
         if (hasSettings) labels += getString(R.string.plugin_settings)
         MaterialAlertDialogBuilder(this)
             .setTitle(descriptor.label)
-            .setMessage(descriptor.description.takeIf(String::isNotBlank))
             .setItems(labels.toTypedArray()) { _, index ->
                 if (hasSettings && index == descriptor.actions.size) {
                     openPluginSettings(plugin, descriptor)
@@ -735,8 +734,8 @@ class EditorActivity : AppCompatActivity() {
         clearAssetTransfer()
         document = MarkdownDocument.parse(state.markdown)
         val line = (state.activeLine ?: lastActiveLine).coerceIn(0, document.size - 1)
-        activeLine = line
         lastActiveLine = line
+        activeLine = line.takeIf { mode == EditorMode.Edit }
         updateMarkdownToolbar()
         updateHistoryButtons()
         refreshRows(
@@ -749,9 +748,8 @@ class EditorActivity : AppCompatActivity() {
 
     private fun updateHistoryButtons() {
         if (!::undoButton.isInitialized || !::redoButton.isInitialized) return
-        val visible = mode == EditorMode.Edit && activeLine != null
-        undoButton.visibility = if (visible) View.VISIBLE else View.GONE
-        redoButton.visibility = if (visible) View.VISIBLE else View.GONE
+        undoButton.visibility = View.VISIBLE
+        redoButton.visibility = View.VISIBLE
         undoButton.isEnabled = history.canUndo
         redoButton.isEnabled = history.canRedo
         undoButton.alpha = if (history.canUndo) 1f else DISABLED_ALPHA
@@ -1219,7 +1217,7 @@ class EditorActivity : AppCompatActivity() {
         }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (mode == EditorMode.Edit && activeLine != null && event.isCtrlPressed) {
+        if (event.isCtrlPressed) {
             when {
                 keyCode == KeyEvent.KEYCODE_Z && event.isShiftPressed -> redo()
                 keyCode == KeyEvent.KEYCODE_Z -> undo()

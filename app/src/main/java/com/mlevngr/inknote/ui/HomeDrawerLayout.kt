@@ -25,6 +25,7 @@ class HomeDrawerLayout @JvmOverloads constructor(
     private var swipeExcludedView: View? = null
     private var nativeDrawerGestureSuppressed = false
     private var drawerIsOpen = false
+    private var openSwipeEnabled = true
 
     init {
         addDrawerListener(object : SimpleDrawerListener() {
@@ -44,15 +45,32 @@ class HomeDrawerLayout @JvmOverloads constructor(
         swipeExcludedView = view
     }
 
+    fun setOpenSwipeEnabled(enabled: Boolean) {
+        if (openSwipeEnabled == enabled) return
+        openSwipeEnabled = enabled
+        if (!enabled && isDrawerOpen(GravityCompat.START)) closeDrawer(GravityCompat.START)
+        applyDrawerLockMode()
+        updateGestureExclusion()
+    }
+
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         val action = event.actionMasked
-        val startsInExcludedView = action == MotionEvent.ACTION_DOWN && isInsideExcludedView(event)
+        val startsInExcludedView =
+            openSwipeEnabled && action == MotionEvent.ACTION_DOWN && isInsideExcludedView(event)
         if (startsInExcludedView) setNativeDrawerGestureSuppressed(true)
         if (
+            openSwipeEnabled &&
             !isDrawerOpen(GravityCompat.START) &&
-            edgeSwipe.onTouch(action, event.x, event.y, startAllowed = !startsInExcludedView)
+            edgeSwipe.onTouch(
+                action,
+                event.x,
+                event.y,
+                startAllowed = !startsInExcludedView
+            )
         ) {
             openDrawer(GravityCompat.START)
+        } else if (!openSwipeEnabled && action == MotionEvent.ACTION_DOWN) {
+            edgeSwipe.onTouch(action, event.x, event.y, startAllowed = false)
         }
         val handled = super.dispatchTouchEvent(event)
         if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
@@ -68,7 +86,9 @@ class HomeDrawerLayout @JvmOverloads constructor(
 
     private fun updateGestureExclusion() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        systemGestureExclusionRects = if (drawerIsOpen || width == 0 || height == 0) {
+        systemGestureExclusionRects = if (
+            !openSwipeEnabled || drawerIsOpen || width == 0 || height == 0
+        ) {
             emptyList()
         } else {
             listOf(
@@ -91,8 +111,16 @@ class HomeDrawerLayout @JvmOverloads constructor(
     private fun setNativeDrawerGestureSuppressed(suppressed: Boolean) {
         if (nativeDrawerGestureSuppressed == suppressed) return
         nativeDrawerGestureSuppressed = suppressed
+        applyDrawerLockMode()
+    }
+
+    private fun applyDrawerLockMode() {
         setDrawerLockMode(
-            if (suppressed) LOCK_MODE_LOCKED_CLOSED else LOCK_MODE_UNLOCKED,
+            if (!openSwipeEnabled || nativeDrawerGestureSuppressed) {
+                LOCK_MODE_LOCKED_CLOSED
+            } else {
+                LOCK_MODE_UNLOCKED
+            },
             GravityCompat.START
         )
     }

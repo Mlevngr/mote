@@ -78,6 +78,8 @@ class PluginManagerActivity : AppCompatActivity() {
             append(descriptor.capabilities.joinToString(" · ") { capabilityLabel(it) })
             appendLine()
             append(if (approved) getString(R.string.plugin_authorized) else getString(R.string.plugin_not_authorized))
+            appendLine()
+            append(getString(R.string.plugin_run_from_editor))
         }.trim()
         return pluginCard(descriptor.label, details).apply {
             setOnClickListener { showPluginDetails(plugin, descriptor) }
@@ -123,7 +125,11 @@ class PluginManagerActivity : AppCompatActivity() {
         val approved = approvals.isApproved(plugin.packageName, descriptor)
         MaterialAlertDialogBuilder(this)
             .setTitle(descriptor.label)
-            .setMessage(descriptor.capabilities.joinToString("\n") { "• ${capabilityLabel(it)}" })
+            .setMessage(buildString {
+                appendLine(descriptor.capabilities.joinToString("\n") { "• ${capabilityLabel(it)}" })
+                appendLine()
+                append(getString(R.string.plugin_run_from_editor))
+            })
             .apply {
                 if (approved) {
                     setNegativeButton(R.string.plugin_revoke) { _, _ ->
