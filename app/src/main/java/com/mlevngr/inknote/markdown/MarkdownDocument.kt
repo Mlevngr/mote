@@ -6,6 +6,8 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
 
     operator fun get(index: Int): String = lines[index]
 
+    fun getOrNull(index: Int): String? = lines.getOrNull(index)
+
     fun snapshot(): List<String> = lines.toList()
 
     fun update(index: Int, source: String) {
@@ -28,8 +30,8 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         return index + 1
     }
 
-    fun renumberOrderedListAt(index: Int): Boolean {
-        val updated = MarkdownEditing.renumberOrderedList(lines, index)
+    fun renumberOrderedListAt(index: Int, startingNumber: Int? = null): Boolean {
+        val updated = MarkdownEditing.renumberOrderedList(lines, index, startingNumber)
         if (updated === lines || updated == lines) return false
         lines.clear()
         lines.addAll(updated)

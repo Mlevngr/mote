@@ -24,7 +24,7 @@
             android:contentDescription="@string/trash_retention"
             android:padding="12dp"
             android:src="@drawable/ic_timer_24"
-            app:tint="?attr/inkNoteTextPrimary" />
+            app:tint="?attr/inkNoteIconColor" />
     </com.google.android.material.appbar.MaterialToolbar>
 
     <FrameLayout

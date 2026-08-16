@@ -33,6 +33,7 @@ import com.mlevngr.inknote.R
 import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.markdown.MarkdownAutoPairing
 import com.mlevngr.inknote.markdown.MarkdownEditResult
+import com.mlevngr.inknote.markdown.MarkdownHistoryKind
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import com.mlevngr.inknote.ui.AssetPreviewVisibility.AssetInstanceKey
 import io.noties.markwon.Markwon
@@ -47,7 +48,7 @@ class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
     private val onPreviewDoubleTap: (Int) -> Unit,
-    private val onLineChanged: (Int, String) -> Unit,
+    private val onLineChanged: (Int, String, MarkdownHistoryKind, Int, Int) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean,
@@ -145,6 +146,8 @@ class HybridNoteAdapter(
         val selectionEnd = editor.selectionEnd.coerceAtLeast(0)
         val result = transform(source, selectionStart, selectionEnd)
         if (result.source != source) {
+            editor.nextHistoryKind = MarkdownHistoryKind.Structural
+            editor.nextHistorySelection = result.selectionStart to result.selectionEnd
             editor.editableText.replace(0, editor.editableText.length, result.source)
         }
         editor.setSelection(
@@ -241,7 +244,7 @@ class HybridNoteAdapter(
         when (row) {
             is HybridRow.Editor -> {
                 bindEditor(holder as EditorHolder, row)
-                holder.editor.setOnLongClickListener(pasteAtBoundaryListener(row.lineIndex))
+                holder.editor.setOnLongClickListener(null)
             }
             is HybridRow.Rendered -> {
                 val activationListener = activationListener(row.lineIndex)
@@ -557,7 +560,7 @@ class HybridNoteAdapter(
         fun bind(
             lineIndex: Int,
             source: String,
-            onChanged: (Int, String) -> Unit,
+            onChanged: (Int, String, MarkdownHistoryKind, Int, Int) -> Unit,
             onSplit: (Int, Int) -> Unit,
             onMultiline: (Int, String, Int) -> Unit,
             onMerge: (Int) -> Boolean
@@ -569,7 +572,22 @@ class HybridNoteAdapter(
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                     val value = s?.toString().orEmpty()
-                    if ('\n' !in value && '\r' !in value) onChanged(lineIndex, value)
+                    if ('\n' !in value && '\r' !in value) {
+                        val inferredKind = when {
+                            before == 0 && count > 0 -> MarkdownHistoryKind.Insert
+                            before > 0 && count == 0 -> MarkdownHistoryKind.Delete
+                            else -> MarkdownHistoryKind.Replace
+                        }
+                        val fallbackCursor = (start + count).coerceIn(0, value.length)
+                        val selection = editor.consumeHistorySelection(fallbackCursor)
+                        onChanged(
+                            lineIndex,
+                            value,
+                            editor.consumeHistoryKind(inferredKind),
+                            selection.first,
+                            selection.second
+                        )
+                    }
                 }
 
                 override fun afterTextChanged(s: Editable?) {
@@ -601,6 +619,14 @@ class HybridNoteAdapter(
 
     private class LineEditText(context: Context) : ImeBackTextInputEditText(context) {
         var onDeleteAtStart: (() -> Boolean)? = null
+        var nextHistoryKind: MarkdownHistoryKind? = null
+        var nextHistorySelection: Pair<Int, Int>? = null
+
+        fun consumeHistoryKind(fallback: MarkdownHistoryKind): MarkdownHistoryKind =
+            nextHistoryKind.also { nextHistoryKind = null } ?: fallback
+
+        fun consumeHistorySelection(fallback: Int): Pair<Int, Int> =
+            nextHistorySelection.also { nextHistorySelection = null } ?: (fallback to fallback)
 
         private fun applyEdit(result: MarkdownEditResult) {
             if (result.source != text?.toString().orEmpty()) {
@@ -688,7 +714,7 @@ class HybridNoteAdapter(
         }
         val menu = AppCompatImageButton(container.context).apply {
             setImageResource(R.drawable.ic_more_vert_24)
-            setColorFilter(ThemeColors.resolve(container.context, R.attr.inkNoteTextSecondary))
+            setColorFilter(ThemeColors.resolve(container.context, R.attr.inkNoteIconColor))
             contentDescription = container.context.getString(R.string.asset_actions)
             val backgroundValue = TypedValue()
             container.context.theme.resolveAttribute(

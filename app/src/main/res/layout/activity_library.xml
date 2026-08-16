@@ -29,7 +29,7 @@
                 android:contentDescription="@string/trash"
                 android:padding="12dp"
                 android:src="@drawable/ic_trash_24"
-                app:tint="?attr/inkNoteTextPrimary" />
+                app:tint="?attr/inkNoteIconColor" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/appearance"
@@ -39,7 +39,7 @@
                 android:contentDescription="@string/appearance"
                 android:padding="12dp"
                 android:src="@drawable/ic_palette_24"
-                app:tint="?attr/inkNoteTextPrimary" />
+                app:tint="?attr/inkNoteIconColor" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/create_folder"
@@ -49,7 +49,7 @@
                 android:contentDescription="@string/create_folder"
                 android:padding="12dp"
                 android:src="@drawable/ic_create_folder_24"
-                app:tint="?attr/inkNoteTextPrimary" />
+                app:tint="?attr/inkNoteIconColor" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/create_note"
@@ -59,7 +59,7 @@
                 android:contentDescription="@string/create_note"
                 android:padding="12dp"
                 android:src="@drawable/ic_note_add_24"
-                app:tint="?attr/inkNoteTextPrimary" />
+                app:tint="?attr/inkNoteIconColor" />
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 

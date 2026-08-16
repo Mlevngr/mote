@@ -8,7 +8,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Menu
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
@@ -31,6 +33,9 @@ import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.markdown.MarkdownBlockStyle
 import com.mlevngr.inknote.markdown.MarkdownEditResult
 import com.mlevngr.inknote.markdown.MarkdownEditing
+import com.mlevngr.inknote.markdown.MarkdownHistory
+import com.mlevngr.inknote.markdown.MarkdownHistoryKind
+import com.mlevngr.inknote.markdown.MarkdownHistoryState
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
@@ -49,9 +54,12 @@ class EditorActivity : AppCompatActivity() {
     private lateinit var rowFactory: HybridRowFactory
     private lateinit var recyclerView: RecyclerView
     private lateinit var modeButton: AppCompatImageButton
+    private lateinit var undoButton: AppCompatImageButton
+    private lateinit var redoButton: AppCompatImageButton
     private lateinit var titleInput: ImeBackTextInputEditText
     private lateinit var markdownToolbar: View
     private lateinit var headingButton: MaterialButton
+    private lateinit var history: MarkdownHistory
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val renderRevision = AtomicInteger()
@@ -106,6 +114,9 @@ class EditorActivity : AppCompatActivity() {
         }
         workspace = initialState.first
         document = initialState.second
+        history = MarkdownHistory(
+            MarkdownHistoryState(document.markdown(), 0, 0, 0)
+        )
         rowFactory = HybridRowFactory(PreviewRowFactory(workspace))
         noteAdapter = HybridNoteAdapter(
             context = this,
@@ -158,6 +169,12 @@ class EditorActivity : AppCompatActivity() {
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
             it.setOnClickListener { toggleMode() }
         }
+        undoButton = findViewById<AppCompatImageButton>(R.id.undo).also {
+            it.setOnClickListener { undo() }
+        }
+        redoButton = findViewById<AppCompatImageButton>(R.id.redo).also {
+            it.setOnClickListener { redo() }
+        }
         findViewById<AppCompatImageButton>(R.id.insert_asset).setOnClickListener {
             openAsset.launch(arrayOf("*/*"))
         }
@@ -165,6 +182,7 @@ class EditorActivity : AppCompatActivity() {
         updateModeButton()
         updateTitleInteraction()
         updateMarkdownToolbar()
+        updateHistoryButtons()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = handleBackNavigation()
         })
@@ -187,18 +205,22 @@ class EditorActivity : AppCompatActivity() {
         mode = EditorMode.Edit
         activeLine = lineIndex.coerceIn(0, document.size - 1)
         lastActiveLine = activeLine ?: 0
+        updateHistoryFocus()
         updateModeButton()
         updateTitleInteraction()
         updateMarkdownToolbar()
+        updateHistoryButtons()
         refreshRows(requestFocus = true)
     }
 
     private fun enterTitleEditMode() {
         mode = EditorMode.Edit
         activeLine = null
+        history.breakGroup()
         updateModeButton()
         updateTitleInteraction()
         updateMarkdownToolbar()
+        updateHistoryButtons()
         refreshRows()
         titleInput.post {
             titleInput.requestFocus()
@@ -212,12 +234,14 @@ class EditorActivity : AppCompatActivity() {
         mode = EditorMode.Read
         activeLine?.let { lastActiveLine = it }
         activeLine = null
+        history.breakGroup()
         titleInput.clearFocus()
         getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(recyclerView.windowToken, 0)
         recyclerView.clearFocus()
         updateModeButton()
         updateTitleInteraction()
         updateMarkdownToolbar()
+        updateHistoryButtons()
         refreshRows()
         scheduleSave()
     }
@@ -315,6 +339,7 @@ class EditorActivity : AppCompatActivity() {
             selectionStart = document[line].length,
             selectionEnd = document[line].length
         )
+        updateHistoryFocus(current)
         val toggled = MarkdownEditing.toggleBlock(
             current.source,
             current.selectionStart,
@@ -332,10 +357,21 @@ class EditorActivity : AppCompatActivity() {
                 toggled.selectionEnd
             )
         } else {
+            val removedNumber = MarkdownEditing.orderedNumber(current.source)
+            val removedIndent = MarkdownEditing.orderedIndent(current.source)
             document.renumberOrderedListAt(line - 1)
-            document.renumberOrderedListAt(line + 1)
+            val nextIndent = document.getOrNull(line + 1)?.let(MarkdownEditing::orderedIndent)
+            if (nextIndent == removedIndent) {
+                document.renumberOrderedListAt(line + 1, startingNumber = removedNumber)
+            }
             toggled
         }
+        recordHistory(
+            MarkdownHistoryKind.Structural,
+            line,
+            selection.selectionEnd,
+            selection.selectionStart
+        )
         refreshRows(
             requestFocus = true,
             cursorPosition = selection.selectionEnd,
@@ -348,6 +384,7 @@ class EditorActivity : AppCompatActivity() {
         transform: (String, Int, Int) -> MarkdownEditResult
     ) {
         val line = activeLine ?: return
+        updateHistoryFocus()
         noteAdapter.editActiveLine(line, transform)
     }
 
@@ -359,6 +396,76 @@ class EditorActivity : AppCompatActivity() {
             val level = MarkdownEditing.headingLevel(document[line])
             headingButton.text = if (level == 0) getString(R.string.markdown_body) else "H$level"
         }
+    }
+
+    private fun recordHistory(
+        kind: MarkdownHistoryKind,
+        line: Int?,
+        cursor: Int,
+        selectionStart: Int = cursor
+    ) {
+        history.record(
+            state = MarkdownHistoryState(
+                markdown = document.markdown(),
+                activeLine = line,
+                selectionStart = selectionStart,
+                selectionEnd = cursor
+            ),
+            kind = kind,
+            line = line,
+            timestampMillis = SystemClock.uptimeMillis()
+        )
+        updateHistoryButtons()
+    }
+
+    private fun updateHistoryFocus(editorState: MarkdownEditResult? = null) {
+        val line = activeLine ?: return
+        val editor = editorState ?: noteAdapter.activeEditState(line)
+        val cursor = editor?.selectionEnd ?: document[line].length
+        history.updateCurrentState(
+            MarkdownHistoryState(
+                markdown = document.markdown(),
+                activeLine = line,
+                selectionStart = editor?.selectionStart ?: cursor,
+                selectionEnd = cursor
+            )
+        )
+        history.breakGroup()
+    }
+
+    private fun undo() {
+        history.undo()?.let(::restoreHistoryState)
+    }
+
+    private fun redo() {
+        history.redo()?.let(::restoreHistoryState)
+    }
+
+    private fun restoreHistoryState(state: MarkdownHistoryState) {
+        clearAssetTransfer()
+        document = MarkdownDocument.parse(state.markdown)
+        val line = (state.activeLine ?: lastActiveLine).coerceIn(0, document.size - 1)
+        activeLine = line
+        lastActiveLine = line
+        updateMarkdownToolbar()
+        updateHistoryButtons()
+        refreshRows(
+            requestFocus = mode == EditorMode.Edit,
+            cursorPosition = state.selectionEnd,
+            selectionStart = state.selectionStart
+        )
+        scheduleSave()
+    }
+
+    private fun updateHistoryButtons() {
+        if (!::undoButton.isInitialized || !::redoButton.isInitialized) return
+        val visible = mode == EditorMode.Edit && activeLine != null
+        undoButton.visibility = if (visible) View.VISIBLE else View.GONE
+        redoButton.visibility = if (visible) View.VISIBLE else View.GONE
+        undoButton.isEnabled = history.canUndo
+        redoButton.isEnabled = history.canRedo
+        undoButton.alpha = if (history.canUndo) 1f else DISABLED_ALPHA
+        redoButton.alpha = if (history.canRedo) 1f else DISABLED_ALPHA
     }
 
     private fun commitTitleRename(): Boolean {
@@ -397,20 +504,45 @@ class EditorActivity : AppCompatActivity() {
         if (mode != EditorMode.Edit || activeLine == index) return
         activeLine = index
         lastActiveLine = index
+        updateHistoryFocus()
         updateMarkdownToolbar()
         refreshRows(requestFocus = true)
     }
 
-    private fun updateLine(index: Int, source: String) {
+    private fun updateLine(
+        index: Int,
+        source: String,
+        kind: MarkdownHistoryKind,
+        selectionStart: Int,
+        selectionEnd: Int
+    ) {
         if (index !in 0 until document.size) return
+        val previous = document[index]
+        val deletedNumber = MarkdownEditing.orderedNumber(previous)
+        val deletedIndent = MarkdownEditing.orderedIndent(previous)
         document.update(index, source)
+        val nextIndent = document.getOrNull(index + 1)?.let(MarkdownEditing::orderedIndent)
+        val renumbered = deletedNumber != null && !MarkdownEditing.isOrderedLine(source) &&
+            nextIndent == deletedIndent &&
+            document.renumberOrderedListAt(index + 1, startingNumber = deletedNumber)
+        recordHistory(kind, index, selectionEnd, selectionStart)
         updateMarkdownToolbar()
+        if (renumbered) {
+            refreshRows(
+                requestFocus = true,
+                cursorPosition = selectionEnd,
+                selectionStart = selectionStart
+            )
+        }
         scheduleSave()
         ensureActiveEditorVisible()
     }
 
     private fun splitLine(index: Int, cursor: Int) {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return
+        updateHistoryFocus(
+            MarkdownEditResult(document[index], cursor, cursor)
+        )
         val orderedSplit = MarkdownEditing.splitOrderedLine(document[index], cursor)
         val cursorPosition = if (orderedSplit == null) {
             activeLine = document.splitLine(index, cursor)
@@ -422,6 +554,7 @@ class EditorActivity : AppCompatActivity() {
             MarkdownEditing.orderedPrefixLength(document[index + 1]) ?: 0
         }
         lastActiveLine = activeLine ?: index
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, cursorPosition)
         updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = cursorPosition)
         scheduleSave()
@@ -429,9 +562,21 @@ class EditorActivity : AppCompatActivity() {
 
     private fun mergeWithPrevious(index: Int): Boolean {
         if (mode != EditorMode.Edit) return false
+        updateHistoryFocus(
+            MarkdownEditResult(document[index], 0, 0)
+        )
+        val deletedLine = document.getOrNull(index)
+        val deletedNumber = deletedLine?.let(MarkdownEditing::orderedNumber)
+        val deletedIndent = deletedLine?.let(MarkdownEditing::orderedIndent)
         val cursor = document.mergeWithPrevious(index) ?: return false
+        if (deletedNumber != null &&
+            document.getOrNull(index)?.let(MarkdownEditing::orderedIndent) == deletedIndent
+        ) {
+            document.renumberOrderedListAt(index, startingNumber = deletedNumber)
+        }
         activeLine = index - 1
         lastActiveLine = activeLine ?: 0
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, cursor)
         updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = cursor)
         scheduleSave()
@@ -451,6 +596,7 @@ class EditorActivity : AppCompatActivity() {
         val cursorInLine = beforeCursor.substringAfterLast('\n').length
         activeLine = index + relativeLine
         lastActiveLine = activeLine ?: index
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, cursorInLine)
         updateMarkdownToolbar()
         refreshRows(requestFocus = true, cursorPosition = cursorInLine)
         scheduleSave()
@@ -458,11 +604,13 @@ class EditorActivity : AppCompatActivity() {
 
     private fun appendLineAtEnd() {
         val lastLine = document.size - 1
+        val inserted = !document[lastLine].isBlank()
         val target = if (document[lastLine].isBlank()) {
             lastLine
         } else {
             document.insertAfter(lastLine, "")
         }
+        if (inserted) recordHistory(MarkdownHistoryKind.Structural, target, 0)
         enterEditModeAt(target)
         scheduleSave()
     }
@@ -534,7 +682,8 @@ class EditorActivity : AppCompatActivity() {
             }
             main.post {
                 result.onSuccess { asset ->
-                    document.insertAfter(activeLine, asset.markdown())
+                    val inserted = document.insertAfter(activeLine, asset.markdown())
+                    recordHistory(MarkdownHistoryKind.Structural, inserted, 0)
                     refreshRows()
                     scheduleSave()
                 }.onFailure {
@@ -588,6 +737,7 @@ class EditorActivity : AppCompatActivity() {
                 }
             }
             lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+            recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
             refreshRows()
             scheduleSave()
         }
@@ -638,6 +788,7 @@ class EditorActivity : AppCompatActivity() {
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         if (transfer != null) clearAssetTransfer()
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
         refreshRows()
         scheduleSave()
         Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
@@ -661,6 +812,7 @@ class EditorActivity : AppCompatActivity() {
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         clearAssetTransfer()
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
         refreshRows()
         scheduleSave()
         Toast.makeText(this, R.string.pasted, Toast.LENGTH_SHORT).show()
@@ -706,10 +858,12 @@ class EditorActivity : AppCompatActivity() {
             }
         }
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
         val remainingMarkdown = document.markdown()
         val retainedClipboardReference = listOfNotNull(
             pendingAssetTransfer?.source,
-            clipboardText()
+            clipboardText(),
+            history.retainedMarkdown()
         ).joinToString("\n")
         io.execute {
             synchronized(workspaceLock) {
@@ -723,6 +877,19 @@ class EditorActivity : AppCompatActivity() {
         }
         refreshRows()
         scheduleSave()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (mode == EditorMode.Edit && activeLine != null && event.isCtrlPressed) {
+            when {
+                keyCode == KeyEvent.KEYCODE_Z && event.isShiftPressed -> redo()
+                keyCode == KeyEvent.KEYCODE_Z -> undo()
+                keyCode == KeyEvent.KEYCODE_Y -> redo()
+                else -> return super.onKeyDown(keyCode, event)
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onStop() {
@@ -748,6 +915,7 @@ class EditorActivity : AppCompatActivity() {
     )
 
     companion object {
+        private const val DISABLED_ALPHA = 0.38f
         private const val SAVE_DELAY_MS = 350L
         private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"

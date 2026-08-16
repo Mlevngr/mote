@@ -122,6 +122,21 @@ class MarkdownEditingTest {
         assertEquals(listOf("5) Alpha", "6) Beta", "7) Gamma"), result)
     }
 
+    @Test fun deletedOrderedItemCanSupplyTheNextSequencesStartingNumber() {
+        val result = MarkdownEditing.renumberOrderedList(
+            listOf("1. Alpha", "plain", "3. Gamma", "4. Delta"),
+            anchor = 2,
+            startingNumber = 2
+        )
+
+        assertEquals(listOf("1. Alpha", "plain", "2. Gamma", "3. Delta"), result)
+    }
+
+    @Test fun orderedIndentIsAvailableForDeletionBoundaryChecks() {
+        assertEquals("  ", MarkdownEditing.orderedIndent("  2. Child"))
+        assertEquals(null, MarkdownEditing.orderedIndent("plain"))
+    }
+
     @Test fun renumberingStopsAtPlainTextAndDifferentIndentation() {
         val source = listOf("1. Parent", "  1. Child", "9. Parent", "plain", "4. Other")
 

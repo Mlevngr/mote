@@ -83,6 +83,10 @@ object MarkdownEditing {
 
     fun isOrderedLine(source: String): Boolean = parseOrderedLine(source) != null
 
+    fun orderedNumber(source: String): Int? = parseOrderedLine(source)?.number
+
+    fun orderedIndent(source: String): String? = parseOrderedLine(source)?.indent
+
     fun orderedPrefixLength(source: String): Int? = parseOrderedLine(source)?.prefixLength
 
     fun splitOrderedLine(source: String, cursor: Int): OrderedListSplit? {
@@ -102,7 +106,11 @@ object MarkdownEditing {
      * level or any non-list line is a boundary. The first item's number is preserved so lists
      * intentionally starting above one keep their meaning.
      */
-    fun renumberOrderedList(lines: List<String>, anchor: Int): List<String> {
+    fun renumberOrderedList(
+        lines: List<String>,
+        anchor: Int,
+        startingNumber: Int? = null
+    ): List<String> {
         if (anchor !in lines.indices) return lines
         val anchored = parseOrderedLine(lines[anchor]) ?: return lines
         var start = anchor
@@ -110,7 +118,7 @@ object MarkdownEditing {
         var end = anchor
         while (end < lines.lastIndex && parseOrderedLine(lines[end + 1])?.indent == anchored.indent) end++
 
-        val firstNumber = parseOrderedLine(lines[start])?.number ?: return lines
+        val firstNumber = startingNumber ?: parseOrderedLine(lines[start])?.number ?: return lines
         var changed = false
         val updated = lines.toMutableList()
         for (index in start..end) {

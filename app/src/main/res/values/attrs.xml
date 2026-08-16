@@ -9,4 +9,5 @@
     <attr name="inkNoteTextPrimary" format="color" />
     <attr name="inkNoteTextSecondary" format="color" />
     <attr name="inkNoteErrorText" format="color" />
+    <attr name="inkNoteIconColor" format="color" />
 </resources>
