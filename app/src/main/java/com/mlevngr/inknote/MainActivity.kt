@@ -76,6 +76,10 @@ class MainActivity : AppCompatActivity() {
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
         drawer = findViewById(R.id.library_root)
+        drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+        findViewById<AppCompatImageButton>(R.id.open_drawer).setOnClickListener {
+            drawer.openDrawer(GravityCompat.START)
+        }
         navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
             button.setOnClickListener { navigateUp() }
         }
@@ -105,7 +109,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<AppCompatImageButton>(R.id.create_note).setOnClickListener {
             showCreateDialog(CreateType.Note)
         }
-        toolbar.setNavigationOnClickListener { drawer.openDrawer(GravityCompat.START) }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (drawer.isDrawerOpen(GravityCompat.START)) {

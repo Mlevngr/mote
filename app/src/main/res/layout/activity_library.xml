@@ -15,10 +15,21 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/inkNoteToolbarBackground"
-            app:navigationContentDescription="@string/open_navigation"
-            app:navigationIcon="@drawable/ic_menu_24"
-            app:navigationIconTint="?attr/inkNoteTextPrimary"
+            app:contentInsetStart="0dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:titleMarginStart="8dp"
             app:titleTextColor="?attr/inkNoteTextPrimary">
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/open_drawer"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="start|center_vertical"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/open_navigation"
+                android:padding="12dp"
+                android:src="@drawable/ic_menu_24"
+                app:tint="?attr/inkNoteIconColor" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
