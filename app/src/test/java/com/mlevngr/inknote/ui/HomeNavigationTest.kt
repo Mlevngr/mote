@@ -7,18 +7,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeNavigationTest {
-    @Test fun leftEdgeHorizontalSwipeOpensDrawer() {
-        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 96f, triggerDistancePx = 32f)
+    @Test fun horizontalSwipeCanStartAnywhereOnHomeContent() {
+        val detector = EdgeSwipeOpenDetector(edgeWidthPx = Float.MAX_VALUE, triggerDistancePx = 32f)
 
-        assertFalse(detector.onTouch(MotionEvent.ACTION_DOWN, 64f, 200f))
-        assertTrue(detector.onTouch(MotionEvent.ACTION_MOVE, 110f, 204f))
+        assertFalse(detector.onTouch(MotionEvent.ACTION_DOWN, 640f, 200f))
+        assertTrue(detector.onTouch(MotionEvent.ACTION_MOVE, 686f, 204f))
     }
 
-    @Test fun movementOutsideEdgeOrMostlyVerticalDoesNotOpenDrawer() {
-        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 96f, triggerDistancePx = 32f)
+    @Test fun folderStripCanDisableDrawerSwipeForItsWholeGesture() {
+        val detector = EdgeSwipeOpenDetector(edgeWidthPx = Float.MAX_VALUE, triggerDistancePx = 32f)
 
-        detector.onTouch(MotionEvent.ACTION_DOWN, 120f, 100f)
-        assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 190f, 102f))
+        detector.onTouch(MotionEvent.ACTION_DOWN, 200f, 100f, startAllowed = false)
+        assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 260f, 102f))
+    }
+
+    @Test fun mostlyVerticalMovementDoesNotOpenDrawer() {
+        val detector = EdgeSwipeOpenDetector(edgeWidthPx = Float.MAX_VALUE, triggerDistancePx = 32f)
+
         detector.onTouch(MotionEvent.ACTION_DOWN, 10f, 100f)
         assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 55f, 180f))
     }

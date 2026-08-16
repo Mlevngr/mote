@@ -18,9 +18,12 @@ class HomeDrawerLayout @JvmOverloads constructor(
 ) : DrawerLayout(context, attrs, defStyleAttr) {
     private val density = resources.displayMetrics.density
     private val edgeSwipe = EdgeSwipeOpenDetector(
-        edgeWidthPx = TOUCH_START_WIDTH_DP * density,
+        edgeWidthPx = Float.MAX_VALUE,
         triggerDistancePx = TRIGGER_DISTANCE_DP * density
     )
+    private val excludedBounds = Rect()
+    private var swipeExcludedView: View? = null
+    private var nativeDrawerGestureSuppressed = false
     private var drawerIsOpen = false
 
     init {
@@ -37,11 +40,25 @@ class HomeDrawerLayout @JvmOverloads constructor(
         })
     }
 
+    fun excludeOpenSwipeFrom(view: View) {
+        swipeExcludedView = view
+    }
+
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (!isDrawerOpen(GravityCompat.START) && edgeSwipe.onTouch(event.actionMasked, event.x, event.y)) {
+        val action = event.actionMasked
+        val startsInExcludedView = action == MotionEvent.ACTION_DOWN && isInsideExcludedView(event)
+        if (startsInExcludedView) setNativeDrawerGestureSuppressed(true)
+        if (
+            !isDrawerOpen(GravityCompat.START) &&
+            edgeSwipe.onTouch(action, event.x, event.y, startAllowed = !startsInExcludedView)
+        ) {
             openDrawer(GravityCompat.START)
         }
-        return super.dispatchTouchEvent(event)
+        val handled = super.dispatchTouchEvent(event)
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            setNativeDrawerGestureSuppressed(false)
+        }
+        return handled
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -65,8 +82,22 @@ class HomeDrawerLayout @JvmOverloads constructor(
         }
     }
 
+    private fun isInsideExcludedView(event: MotionEvent): Boolean {
+        val excluded = swipeExcludedView ?: return false
+        return excluded.isShown && excluded.getGlobalVisibleRect(excludedBounds) &&
+            excludedBounds.contains(event.rawX.toInt(), event.rawY.toInt())
+    }
+
+    private fun setNativeDrawerGestureSuppressed(suppressed: Boolean) {
+        if (nativeDrawerGestureSuppressed == suppressed) return
+        nativeDrawerGestureSuppressed = suppressed
+        setDrawerLockMode(
+            if (suppressed) LOCK_MODE_LOCKED_CLOSED else LOCK_MODE_UNLOCKED,
+            GravityCompat.START
+        )
+    }
+
     private companion object {
-        const val TOUCH_START_WIDTH_DP = 96f
         const val TRIGGER_DISTANCE_DP = 32f
         const val SYSTEM_EDGE_EXCLUSION_WIDTH_DP = 32f
         const val SYSTEM_EDGE_EXCLUSION_HEIGHT_DP = 196f
@@ -81,9 +112,14 @@ internal class EdgeSwipeOpenDetector(
     private var downX = 0f
     private var downY = 0f
 
-    fun onTouch(action: Int, x: Float, y: Float): Boolean = when (action) {
+    fun onTouch(
+        action: Int,
+        x: Float,
+        y: Float,
+        startAllowed: Boolean = true
+    ): Boolean = when (action) {
         MotionEvent.ACTION_DOWN -> {
-            tracking = x <= edgeWidthPx
+            tracking = startAllowed && x <= edgeWidthPx
             downX = x
             downY = y
             false

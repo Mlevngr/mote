@@ -42,6 +42,7 @@ import com.mlevngr.inknote.library.TrashPreferences
 import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.FolderStripAdapter
+import com.mlevngr.inknote.ui.HomeDrawerLayout
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -53,7 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var libraryTitle: TextView
-    private lateinit var drawer: DrawerLayout
+    private lateinit var drawer: HomeDrawerLayout
     private lateinit var navigateUpButton: AppCompatImageButton
     private lateinit var emptyView: TextView
     private lateinit var folderSection: View
@@ -93,7 +94,7 @@ class MainActivity : AppCompatActivity() {
         }
         emptyView = findViewById(R.id.empty_library)
         folderSection = findViewById(R.id.folder_section)
-        findViewById<RecyclerView>(R.id.folder_strip).apply {
+        val folderStrip = findViewById<RecyclerView>(R.id.folder_strip).apply {
             layoutManager = LinearLayoutManager(
                 this@MainActivity,
                 LinearLayoutManager.HORIZONTAL,
@@ -102,6 +103,7 @@ class MainActivity : AppCompatActivity() {
             adapter = folderAdapter
             itemAnimator = null
         }
+        drawer.excludeOpenSwipeFrom(folderStrip)
         recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
             itemAnimator = null
