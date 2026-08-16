@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="none">
+        <item
+            android:id="@+id/navigation_appearance"
+            android:icon="@drawable/ic_palette_24"
+            android:title="@string/appearance" />
+        <item
+            android:id="@+id/navigation_webdav"
+            android:icon="@drawable/ic_cloud_sync_24"
+            android:title="@string/webdav_sync" />
+        <item
+            android:id="@+id/navigation_plugins"
+            android:icon="@drawable/ic_extension_24"
+            android:title="@string/plugin_manager" />
+        <item
+            android:id="@+id/navigation_trash"
+            android:icon="@drawable/ic_trash_24"
+            android:title="@string/trash" />
+    </group>
+</menu>

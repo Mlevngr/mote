@@ -1,0 +1,2 @@
+-keep class com.mlevngr.mote.plugin.ai.AiOrganizerService { *; }
+-keep class com.mlevngr.mote.plugin.api.** { *; }

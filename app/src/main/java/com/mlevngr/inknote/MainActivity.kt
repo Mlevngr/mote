@@ -19,11 +19,14 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.navigation.NavigationView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.mlevngr.inknote.appearance.AppTheme
@@ -47,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var toolbar: MaterialToolbar
+    private lateinit var drawer: DrawerLayout
     private lateinit var emptyView: TextView
     private lateinit var recyclerView: RecyclerView
     private var currentFolder = FolderLocation.Root
@@ -70,31 +74,42 @@ class MainActivity : AppCompatActivity() {
         }.getOrNull() ?: FolderLocation.Root
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         toolbar = findViewById(R.id.library_toolbar)
+        drawer = findViewById(R.id.library_root)
         emptyView = findViewById(R.id.empty_library)
         recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
             itemAnimator = null
         }
         configureLibraryLayout()
-        findViewById<AppCompatImageButton>(R.id.open_trash).setOnClickListener {
-            startActivity(Intent(this, TrashActivity::class.java))
-        }
-        findViewById<AppCompatImageButton>(R.id.appearance).setOnClickListener {
-            showAppearanceDialog()
-        }
-        findViewById<AppCompatImageButton>(R.id.webdav_sync).setOnClickListener {
-            startActivity(Intent(this, WebDavSettingsActivity::class.java))
-        }
+        findViewById<NavigationView>(R.id.library_navigation)
+            .setNavigationItemSelectedListener { item ->
+                when (item.itemId) {
+                    R.id.navigation_appearance -> showAppearanceDialog()
+                    R.id.navigation_webdav ->
+                        startActivity(Intent(this, WebDavSettingsActivity::class.java))
+                    R.id.navigation_plugins ->
+                        startActivity(Intent(this, PluginManagerActivity::class.java))
+                    R.id.navigation_trash ->
+                        startActivity(Intent(this, TrashActivity::class.java))
+                }
+                drawer.closeDrawer(GravityCompat.START)
+                true
+            }
         findViewById<AppCompatImageButton>(R.id.create_folder).setOnClickListener {
             showCreateDialog(CreateType.Folder)
         }
         findViewById<AppCompatImageButton>(R.id.create_note).setOnClickListener {
             showCreateDialog(CreateType.Note)
         }
-        toolbar.setNavigationOnClickListener { navigateUp() }
+        toolbar.setNavigationOnClickListener {
+            if (currentFolder.names.isEmpty()) drawer.openDrawer(GravityCompat.START)
+            else navigateUp()
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentFolder.names.isNotEmpty()) navigateUp()
+                if (drawer.isDrawerOpen(GravityCompat.START)) {
+                    drawer.closeDrawer(GravityCompat.START)
+                } else if (currentFolder.names.isNotEmpty()) navigateUp()
                 else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -141,9 +156,13 @@ class MainActivity : AppCompatActivity() {
                 emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
                 else android.view.View.GONE
                 toolbar.title = currentFolder.title ?: getString(R.string.app_name)
-                if (currentFolder.names.isEmpty()) toolbar.navigationIcon = null
-                else toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
-                toolbar.navigationContentDescription = getString(R.string.go_up)
+                if (currentFolder.names.isEmpty()) {
+                    toolbar.setNavigationIcon(R.drawable.ic_menu_24)
+                    toolbar.navigationContentDescription = getString(R.string.open_navigation)
+                } else {
+                    toolbar.setNavigationIcon(R.drawable.ic_arrow_back_24)
+                    toolbar.navigationContentDescription = getString(R.string.go_up)
+                }
             }
         }
     }

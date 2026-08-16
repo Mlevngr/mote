@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="plugins">插件</string>
+    <string name="plugin_manager">插件管理</string>
+    <string name="library_drawer_subtitle">笔记与应用设置</string>
+    <string name="open_navigation">打开导航侧边栏</string>
+    <string name="no_plugins_installed">尚未安装 Mote 插件。安装兼容插件 APK 后会自动出现在这里。</string>
+    <string name="plugin_loading">正在读取插件能力…</string>
+    <string name="plugin_authorized">已授权</string>
+    <string name="plugin_not_authorized">首次使用时请求授权</string>
+    <string name="plugin_revoke">撤销授权</string>
+    <string name="plugin_permissions">插件权限</string>
+    <string name="plugin_allow">允许并继续</string>
+    <string name="plugin_processing">插件正在处理笔记…</string>
+    <string name="plugin_cancel">取消请求</string>
+    <string name="plugin_preview">插件修改预览</string>
+    <string name="plugin_apply">应用修改</string>
+    <string name="plugin_settings">插件设置</string>
+    <string name="plugin_no_changes">插件没有生成内容变化</string>
+    <string name="plugin_stale_result">笔记已经变化，已丢弃过期的插件结果</string>
+    <string name="plugin_unavailable">插件已卸载、断开或不可用</string>
     <string name="app_name">Mote</string>
     <string name="switch_to_edit_mode">切换到编辑模式</string>
     <string name="switch_to_read_mode">切换到阅读模式</string>

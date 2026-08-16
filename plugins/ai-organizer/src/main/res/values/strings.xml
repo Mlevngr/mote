@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mote AI Organizer</string>
+    <string name="settings_title">AI Organizer 设置</string>
+    <string name="internal_endpoint">内网 API 地址</string>
+    <string name="external_endpoint">外网 API 地址</string>
+    <string name="model">模型名称</string>
+    <string name="api_key">API Key（本机加密保存）</string>
+    <string name="save">保存</string>
+    <string name="saved">设置已保存</string>
+    <string name="endpoint_help">兼容 OpenAI Chat Completions API。将优先尝试内网地址，失败后使用外网地址；地址可填写服务根地址或完整的 /v1/chat/completions 地址。</string>
+</resources>

@@ -3,6 +3,7 @@ package com.mlevngr.inknote
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.ComponentName
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
@@ -14,6 +15,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +47,19 @@ import com.mlevngr.inknote.ui.ImeBackTextInputEditText
 import com.mlevngr.inknote.ui.NoteCanvasZoomLayout
 import com.mlevngr.inknote.ui.PreviewRowFactory
 import com.mlevngr.inknote.ui.SystemBarInsets
+import com.mlevngr.inknote.plugins.DiscoveredPlugin
+import com.mlevngr.inknote.plugins.MotePluginHost
+import com.mlevngr.inknote.plugins.PluginApprovalStore
+import com.mlevngr.inknote.plugins.PluginDocumentGuard
+import com.mlevngr.inknote.plugins.PluginCapabilityLabels
+import com.mlevngr.inknote.plugins.PluginResultGate
+import com.mlevngr.mote.plugin.api.PluginAction
+import com.mlevngr.mote.plugin.api.PluginCapability
+import com.mlevngr.mote.plugin.api.PluginContract
+import com.mlevngr.mote.plugin.api.PluginDescriptor
+import com.mlevngr.mote.plugin.api.PluginError
+import com.mlevngr.mote.plugin.api.PluginRequest
+import com.mlevngr.mote.plugin.api.PluginResult
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.File
@@ -63,6 +79,8 @@ class EditorActivity : AppCompatActivity() {
     private lateinit var titleInput: ImeBackTextInputEditText
     private lateinit var markdownToolbar: View
     private lateinit var headingButton: MaterialButton
+    private lateinit var pluginButton: AppCompatImageButton
+    private lateinit var pluginHost: MotePluginHost
     private lateinit var history: MarkdownHistory
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -72,6 +90,12 @@ class EditorActivity : AppCompatActivity() {
     private var lastActiveLine = 0
     private var saveTask: Runnable? = null
     private var previewScaleTask: Runnable? = null
+    private var availablePlugins: List<DiscoveredPlugin> = emptyList()
+    private val pluginSessionId = UUID.randomUUID().toString()
+    private val pluginResultGate = PluginResultGate(pluginSessionId)
+    private var activePluginRequestId: String? = null
+    private var activePluginId: String? = null
+    private var pluginProgressDialog: androidx.appcompat.app.AlertDialog? = null
     private var noteName = ""
     private var pendingAssetTransfer: AssetTransfer? = null
     private val workspaceLock = Any()
@@ -182,6 +206,9 @@ class EditorActivity : AppCompatActivity() {
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
             it.setOnClickListener { toggleMode() }
         }
+        pluginButton = findViewById<AppCompatImageButton>(R.id.plugins).also {
+            it.setOnClickListener { showPluginPicker() }
+        }
         undoButton = findViewById<AppCompatImageButton>(R.id.undo).also {
             it.setOnClickListener { undo() }
         }
@@ -200,7 +227,257 @@ class EditorActivity : AppCompatActivity() {
             override fun handleOnBackPressed() = handleBackNavigation()
         })
         refreshRows()
+        pluginHost = MotePluginHost(this, ::onPluginsChanged)
+        pluginHost.start()
     }
+
+    private fun onPluginsChanged(plugins: List<DiscoveredPlugin>) {
+        val removed = availablePlugins.map(DiscoveredPlugin::pluginId).toSet() -
+            plugins.map(DiscoveredPlugin::pluginId).toSet()
+        removed.forEach(pluginResultGate::disconnectPlugin)
+        if (activePluginId in removed) {
+            activePluginRequestId?.let(pluginHost::cancel)
+            dismissPluginProgress()
+            Toast.makeText(this, R.string.plugin_unavailable, Toast.LENGTH_SHORT).show()
+        }
+        availablePlugins = plugins
+        pluginButton.visibility = if (plugins.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    private fun showPluginPicker() {
+        if (availablePlugins.isEmpty()) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.plugins)
+            .setItems(availablePlugins.map(DiscoveredPlugin::label).toTypedArray()) { _, index ->
+                loadPluginActions(availablePlugins[index])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun loadPluginActions(plugin: DiscoveredPlugin) {
+        pluginHost.loadDescriptor(
+            plugin,
+            onLoaded = { descriptor -> showPluginActions(plugin, descriptor) },
+            onError = { message -> showPluginError(message) }
+        )
+    }
+
+    private fun showPluginActions(plugin: DiscoveredPlugin, descriptor: PluginDescriptor) {
+        val labels = descriptor.actions.map(PluginAction::label).toMutableList()
+        val hasSettings = !descriptor.settingsActivity.isNullOrBlank()
+        if (hasSettings) labels += getString(R.string.plugin_settings)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(descriptor.label)
+            .setMessage(descriptor.description.takeIf(String::isNotBlank))
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (hasSettings && index == descriptor.actions.size) {
+                    openPluginSettings(plugin, descriptor)
+                } else {
+                    authorizePluginAction(plugin, descriptor, descriptor.actions[index])
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun authorizePluginAction(
+        plugin: DiscoveredPlugin,
+        descriptor: PluginDescriptor,
+        action: PluginAction
+    ) {
+        val approvals = PluginApprovalStore(this)
+        if (approvals.isApproved(plugin.packageName, descriptor)) {
+            executePluginAction(plugin, descriptor, action)
+            return
+        }
+        val permissionText = descriptor.capabilities
+            .sortedBy(Enum<*>::name)
+            .joinToString("\n") { "• ${pluginCapabilityLabel(it)}" }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.plugin_permissions)
+            .setMessage("${descriptor.label}\n\n$permissionText")
+            .setPositiveButton(R.string.plugin_allow) { _, _ ->
+                approvals.approve(plugin.packageName, descriptor)
+                executePluginAction(plugin, descriptor, action)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun executePluginAction(
+        plugin: DiscoveredPlugin,
+        descriptor: PluginDescriptor,
+        action: PluginAction
+    ) {
+        val markdown = document.markdown()
+        val requestId = UUID.randomUUID().toString()
+        val revision = PluginDocumentGuard.revision(markdown)
+        val request = PluginRequest(
+            sessionId = pluginSessionId,
+            requestId = requestId,
+            actionId = action.id,
+            baseRevision = revision,
+            noteTitle = noteName,
+            markdown = markdown
+        )
+        pluginResultGate.start(requestId, descriptor.pluginId, revision)
+        activePluginRequestId = requestId
+        activePluginId = descriptor.pluginId
+        showPluginProgress(requestId)
+        pluginHost.execute(
+            plugin,
+            request,
+            onResult = { result -> handlePluginResult(plugin, descriptor, result) },
+            onError = { error -> handlePluginError(plugin, descriptor, error) }
+        )
+    }
+
+    private fun showPluginProgress(requestId: String) {
+        dismissPluginProgress()
+        pluginProgressDialog = MaterialAlertDialogBuilder(this)
+            .setMessage(R.string.plugin_processing)
+            .setNegativeButton(R.string.plugin_cancel) { _, _ ->
+                pluginHost.cancel(requestId)
+                pluginResultGate.cancel(requestId)
+                activePluginRequestId = null
+                activePluginId = null
+            }
+            .setOnCancelListener {
+                pluginHost.cancel(requestId)
+                pluginResultGate.cancel(requestId)
+                activePluginRequestId = null
+                activePluginId = null
+            }
+            .show()
+    }
+
+    private fun handlePluginResult(
+        plugin: DiscoveredPlugin,
+        descriptor: PluginDescriptor,
+        result: PluginResult
+    ) {
+        dismissPluginProgress()
+        activePluginRequestId = null
+        activePluginId = null
+        val current = document.markdown()
+        if (!pluginResultGate.accept(result, PluginDocumentGuard.revision(current))) {
+            Toast.makeText(this, R.string.plugin_stale_result, Toast.LENGTH_LONG).show()
+            return
+        }
+        when (val validation = PluginDocumentGuard.validate(current, result.markdown)) {
+            is PluginDocumentGuard.ValidationResult.Invalid -> {
+                showPluginError(validation.reason)
+            }
+            PluginDocumentGuard.ValidationResult.Valid -> {
+                if (current == result.markdown) {
+                    Toast.makeText(this, R.string.plugin_no_changes, Toast.LENGTH_SHORT).show()
+                } else {
+                    showPluginPreview(plugin, descriptor, current, result)
+                }
+            }
+        }
+    }
+
+    private fun showPluginPreview(
+        plugin: DiscoveredPlugin,
+        descriptor: PluginDescriptor,
+        original: String,
+        result: PluginResult
+    ) {
+        val content = TextView(this).apply {
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            setTextColor(com.mlevngr.inknote.appearance.ThemeColors.resolve(
+                this@EditorActivity,
+                R.attr.inkNoteTextPrimary
+            ))
+            textSize = 15f
+            setTextIsSelectable(true)
+            text = buildString {
+                if (result.summary.isNotBlank()) appendLine(result.summary).appendLine()
+                append(result.markdown.take(30_000))
+                if (result.markdown.length > 30_000) append("\n\n…")
+            }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.plugin_preview)
+            .setView(ScrollView(this).apply { addView(content) })
+            .setPositiveButton(R.string.plugin_apply) { _, _ ->
+                if (document.markdown() != original) {
+                    Toast.makeText(this, R.string.plugin_stale_result, Toast.LENGTH_LONG).show()
+                } else {
+                    applyPluginResult(result.markdown)
+                }
+            }
+            .apply {
+                if (descriptor.settingsActivity != null) {
+                    setNeutralButton(R.string.plugin_settings) { _, _ ->
+                        openPluginSettings(plugin, descriptor)
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyPluginResult(markdown: String) {
+        updateHistoryFocus()
+        document = MarkdownDocument.parse(markdown)
+        lastActiveLine = 0
+        recordHistory(MarkdownHistoryKind.Structural, null, 0)
+        if (mode == EditorMode.Edit) {
+            enterReadMode()
+        } else {
+            refreshRows()
+            scheduleSave()
+        }
+    }
+
+    private fun handlePluginError(
+        plugin: DiscoveredPlugin,
+        descriptor: PluginDescriptor,
+        error: PluginError
+    ) {
+        dismissPluginProgress()
+        pluginResultGate.cancel(error.requestId)
+        activePluginRequestId = null
+        activePluginId = null
+        showPluginError(error.message, plugin, descriptor)
+    }
+
+    private fun showPluginError(
+        message: String,
+        plugin: DiscoveredPlugin? = null,
+        descriptor: PluginDescriptor? = null
+    ) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.plugins)
+            .setMessage(message)
+            .apply {
+                if (plugin != null && descriptor?.settingsActivity != null) {
+                    setPositiveButton(R.string.plugin_settings) { _, _ ->
+                        openPluginSettings(plugin, descriptor)
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun openPluginSettings(plugin: DiscoveredPlugin, descriptor: PluginDescriptor) {
+        val activityName = descriptor.settingsActivity ?: return
+        runCatching {
+            startActivity(Intent().setComponent(ComponentName(plugin.packageName, activityName)))
+        }.onFailure { showPluginError(getString(R.string.plugin_unavailable)) }
+    }
+
+    private fun dismissPluginProgress() {
+        pluginProgressDialog?.dismiss()
+        pluginProgressDialog = null
+    }
+
+    private fun pluginCapabilityLabel(capability: PluginCapability): String =
+        PluginCapabilityLabels.label(capability)
 
     private fun toggleMode() {
         if (mode == EditorMode.Read) enterEditMode() else enterReadMode()
@@ -965,6 +1242,9 @@ class EditorActivity : AppCompatActivity() {
     override fun onDestroy() {
         saveTask?.let(main::removeCallbacks)
         previewScaleTask?.let(main::removeCallbacks)
+        dismissPluginProgress()
+        pluginResultGate.invalidate(UUID.randomUUID().toString())
+        if (::pluginHost.isInitialized) pluginHost.close()
         if (::noteAdapter.isInitialized) noteAdapter.close()
         io.shutdown()
         super.onDestroy()

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MoteAiPlugin"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".AiSettingsActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".AiOrganizerService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.mlevngr.mote.action.PLUGIN_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="com.mlevngr.mote.plugin.API_VERSION"
+                android:value="1" />
+            <meta-data
+                android:name="com.mlevngr.mote.plugin.ID"
+                android:value="mote.ai.organizer" />
+            <meta-data
+                android:name="com.mlevngr.mote.plugin.LABEL"
+                android:value="Mote AI Organizer" />
+        </service>
+    </application>
+</manifest>

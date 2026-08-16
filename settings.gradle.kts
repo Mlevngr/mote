@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "InkNote"
 include(":app")
+include(":plugin-api")
+include(":plugins:ai-organizer")

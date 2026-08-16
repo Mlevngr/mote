@@ -1,104 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/library_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/library_toolbar"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/inkNoteToolbarBackground"
-        app:navigationIconTint="?attr/inkNoteTextPrimary"
-        app:titleTextColor="?attr/inkNoteTextPrimary">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/open_trash"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/trash"
-                android:padding="12dp"
-                android:src="@drawable/ic_trash_24"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/appearance"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/appearance"
-                android:padding="12dp"
-                android:src="@drawable/ic_palette_24"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/webdav_sync"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/webdav_sync"
-                android:padding="12dp"
-                android:src="@drawable/ic_cloud_sync_24"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/create_folder"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/create_folder"
-                android:padding="12dp"
-                android:src="@drawable/ic_create_folder_24"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/create_note"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/create_note"
-                android:padding="12dp"
-                android:src="@drawable/ic_note_add_24"
-                app:tint="?attr/inkNoteIconColor" />
-        </LinearLayout>
-    </com.google.android.material.appbar.MaterialToolbar>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/library_list"
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/library_toolbar"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingTop="8dp"
-            android:paddingBottom="24dp"
-            android:scrollbars="vertical" />
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/inkNoteToolbarBackground"
+            app:navigationIconTint="?attr/inkNoteTextPrimary"
+            app:titleTextColor="?attr/inkNoteTextPrimary">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/empty_library"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:drawablePadding="12dp"
-            android:gravity="center"
-            android:text="@string/empty_library"
-            android:textColor="?attr/inkNoteTextSecondary"
-            android:textSize="16sp"
-            app:drawableTint="?attr/inkNoteTextSecondary"
-            app:drawableTopCompat="@drawable/ic_note_24" />
-    </FrameLayout>
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-</LinearLayout>
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/create_folder"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/create_folder"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_create_folder_24"
+                    app:tint="?attr/inkNoteIconColor" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/create_note"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/create_note"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_note_add_24"
+                    app:tint="?attr/inkNoteIconColor" />
+            </LinearLayout>
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/library_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="8dp"
+                android:paddingBottom="24dp"
+                android:scrollbars="vertical" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/empty_library"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:drawablePadding="12dp"
+                android:gravity="center"
+                android:text="@string/empty_library"
+                android:textColor="?attr/inkNoteTextSecondary"
+                android:textSize="16sp"
+                app:drawableTint="?attr/inkNoteTextSecondary"
+                app:drawableTopCompat="@drawable/ic_note_24" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/library_navigation"
+        android:layout_width="304dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="?attr/colorSurfaceContainer"
+        app:headerLayout="@layout/library_drawer_header"
+        app:itemIconTint="?attr/inkNoteIconColor"
+        app:itemTextColor="?attr/inkNoteTextPrimary"
+        app:menu="@menu/library_drawer" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

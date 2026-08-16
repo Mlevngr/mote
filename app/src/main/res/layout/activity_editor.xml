@@ -22,6 +22,17 @@
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/plugins"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/plugins"
+                android:padding="12dp"
+                android:src="@drawable/ic_extension_24"
+                android:visibility="gone"
+                app:tint="?attr/inkNoteIconColor" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/insert_asset"
                 android:layout_width="48dp"
                 android:layout_height="48dp"

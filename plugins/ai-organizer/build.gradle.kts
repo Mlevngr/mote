@@ -3,16 +3,15 @@ plugins {
 }
 
 android {
-    namespace = "com.mlevngr.inknote"
+    namespace = "com.mlevngr.mote.plugin.ai"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.mlevngr.inknote"
+        applicationId = "com.mlevngr.mote.plugin.ai.organizer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 41
-        versionName = "0.8.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     signingConfigs {
@@ -44,27 +43,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    testOptions {
-        unitTests.isIncludeAndroidResources = false
-    }
 }
 
 dependencies {
     implementation(project(":plugin-api"))
     implementation("androidx.core:core-ktx:1.18.0")
-    implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
     implementation("com.google.android.material:material:1.14.0")
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
-
-    val markwon = "4.6.2"
-    implementation("io.noties.markwon:core:$markwon")
-    implementation("io.noties.markwon:ext-strikethrough:$markwon")
-    implementation("io.noties.markwon:ext-tables:$markwon")
-    implementation("io.noties.markwon:ext-tasklist:$markwon")
-
     testImplementation("junit:junit:4.13.2")
 }
