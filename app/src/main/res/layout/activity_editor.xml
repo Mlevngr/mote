@@ -22,28 +22,6 @@
             android:orientation="horizontal">
 
             <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/undo"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/undo"
-                android:padding="12dp"
-                android:src="@drawable/ic_undo_24"
-                android:visibility="gone"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/redo"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/redo"
-                android:padding="12dp"
-                android:src="@drawable/ic_redo_24"
-                android:visibility="gone"
-                app:tint="?attr/inkNoteIconColor" />
-
-            <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/insert_asset"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
@@ -69,7 +47,7 @@
         android:id="@+id/note_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@null"
+        android:background="?attr/inkNoteToolbarBackground"
         android:ellipsize="end"
         android:hint="@string/note_title_hint"
         android:imeOptions="actionDone"
@@ -78,12 +56,18 @@
         android:paddingStart="18dp"
         android:paddingTop="14dp"
         android:paddingEnd="18dp"
-        android:paddingBottom="8dp"
+        android:paddingBottom="14dp"
         android:singleLine="true"
         android:textColor="?attr/inkNoteTextPrimary"
         android:textColorHint="?attr/inkNoteTextSecondary"
         android:textSize="28sp"
         android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:alpha="0.35"
+        android:background="?attr/colorOutline" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/note_content"
@@ -115,6 +99,40 @@
             android:orientation="horizontal"
             android:paddingStart="8dp"
             android:paddingEnd="8dp">
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/undo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/undo"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_undo_24"
+                android:visibility="gone"
+                android:tooltipText="@string/undo"
+                app:tint="?attr/inkNoteIconColor" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/redo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/redo"
+                android:focusable="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_redo_24"
+                android:visibility="gone"
+                android:tooltipText="@string/redo"
+                app:tint="?attr/inkNoteIconColor" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="10dp"
+                android:alpha="0.5"
+                android:background="?attr/colorOutline" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/markdown_heading"

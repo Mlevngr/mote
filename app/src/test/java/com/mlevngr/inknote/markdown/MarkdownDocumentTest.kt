@@ -44,6 +44,54 @@ class MarkdownDocumentTest {
         assertEquals("1. First\nplain\n2. Third\n3. Fourth", document.markdown())
     }
 
+    @Test fun restoringADeletedMarkerRejoinsAndRenumbersTheList() {
+        val document = MarkdownDocument.parse("1. First\n. Restored\n2. Second\n3. Third")
+
+        val update = document.updateWithOrderedListReconciliation(1, "2. Restored", 1, 1)
+
+        assertEquals(true, update.renumbered)
+        assertEquals("1. First\n2. Restored\n3. Second\n4. Third", document.markdown())
+        assertEquals(1, update.edit.selectionStart)
+        assertEquals(1, update.edit.selectionEnd)
+    }
+
+    @Test fun deletingAndRestoringAnOrderedMarkerWorksInBothDirections() {
+        val document = MarkdownDocument.parse("1. First\n2. Middle\n3. Third\n4. Fourth")
+
+        document.updateWithOrderedListReconciliation(1, ". Middle", 0, 0)
+        assertEquals("1. First\n. Middle\n2. Third\n3. Fourth", document.markdown())
+
+        document.updateWithOrderedListReconciliation(1, "2. Middle", 1, 1)
+        assertEquals("1. First\n2. Middle\n3. Third\n4. Fourth", document.markdown())
+    }
+
+    @Test fun changingAMiddleItemNumberNormalizesTheWholeRun() {
+        val document = MarkdownDocument.parse("1. First\n2. Middle\n3. Third")
+
+        val update = document.updateWithOrderedListReconciliation(1, "9. Middle", 1, 1)
+
+        assertEquals(true, update.renumbered)
+        assertEquals("1. First\n2. Middle\n3. Third", document.markdown())
+        assertEquals(3, update.edit.selectionStart)
+    }
+
+    @Test fun changingOnlyListContentDoesNotRenumberOrRefresh() {
+        val document = MarkdownDocument.parse("1. First\n2. Middle\n3. Third")
+
+        val update = document.updateWithOrderedListReconciliation(1, "2. Changed", 10, 10)
+
+        assertEquals(false, update.renumbered)
+        assertEquals("1. First\n2. Changed\n3. Third", document.markdown())
+    }
+
+    @Test fun changingIndentRenumbersTheOldRunWithoutTouchingTheNestedRun() {
+        val document = MarkdownDocument.parse("1. First\n2. Middle\n3. Third\n4. Fourth")
+
+        document.updateWithOrderedListReconciliation(1, "  1. Nested", 5, 5)
+
+        assertEquals("1. First\n  1. Nested\n2. Third\n3. Fourth", document.markdown())
+    }
+
     @Test fun backspaceAtLineStartMergesWithPreviousLine() {
         val document = MarkdownDocument.parse("Hello\n world")
         assertEquals(5, document.mergeWithPrevious(1))

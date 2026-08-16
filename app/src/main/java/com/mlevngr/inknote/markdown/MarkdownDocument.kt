@@ -1,5 +1,10 @@
 package com.mlevngr.inknote.markdown
 
+data class MarkdownLineUpdateResult(
+    val edit: MarkdownEditResult,
+    val renumbered: Boolean
+)
+
 /** A lossless, line-oriented Markdown model used by the hybrid editor. */
 class MarkdownDocument private constructor(private val lines: MutableList<String>) {
     val size: Int get() = lines.size
@@ -36,6 +41,53 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         lines.clear()
         lines.addAll(updated)
         return true
+    }
+
+    /**
+     * Updates one editor line and reconciles ordered-list numbering when its marker changes.
+     * Normal content typing does not scan the surrounding list.
+     */
+    fun updateWithOrderedListReconciliation(
+        index: Int,
+        source: String,
+        selectionStart: Int,
+        selectionEnd: Int
+    ): MarkdownLineUpdateResult {
+        val previous = lines[index]
+        val previousNumber = MarkdownEditing.orderedNumber(previous)
+        val previousIndent = MarkdownEditing.orderedIndent(previous)
+        val previousPrefix = MarkdownEditing.orderedPrefix(previous)
+        update(index, source)
+
+        val currentIndent = MarkdownEditing.orderedIndent(source)
+        val currentPrefix = MarkdownEditing.orderedPrefix(source)
+        var renumbered = false
+
+        // Moving out of an existing list run closes the gap left in that run.
+        if (previousNumber != null && previousIndent != currentIndent) {
+            val nextIndent = getOrNull(index + 1)?.let(MarkdownEditing::orderedIndent)
+            if (nextIndent == previousIndent) {
+                renumbered = renumberOrderedListAt(index + 1, startingNumber = previousNumber)
+            }
+        }
+
+        // Adding, restoring or changing a marker joins and normalizes the new list run.
+        if (currentPrefix != null && currentPrefix != previousPrefix) {
+            renumbered = renumberOrderedListAt(index) || renumbered
+        }
+
+        val finalSource = lines[index]
+        val edit = if (finalSource == source) {
+            MarkdownEditResult(source, selectionStart, selectionEnd)
+        } else {
+            MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+                source,
+                finalSource,
+                selectionStart,
+                selectionEnd
+            )
+        }
+        return MarkdownLineUpdateResult(edit, renumbered)
     }
 
     /** Joins this line into the previous line and returns the new cursor position. */

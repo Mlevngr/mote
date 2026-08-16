@@ -89,6 +89,10 @@ object MarkdownEditing {
 
     fun orderedPrefixLength(source: String): Int? = parseOrderedLine(source)?.prefixLength
 
+    fun orderedPrefix(source: String): String? = parseOrderedLine(source)?.let {
+        source.substring(0, it.prefixLength)
+    }
+
     fun splitOrderedLine(source: String, cursor: Int): OrderedListSplit? {
         val ordered = parseOrderedLine(source) ?: return null
         val splitAt = cursor.coerceIn(ordered.prefixLength, source.length)

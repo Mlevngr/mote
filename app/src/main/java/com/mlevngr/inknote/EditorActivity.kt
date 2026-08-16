@@ -517,21 +517,19 @@ class EditorActivity : AppCompatActivity() {
         selectionEnd: Int
     ) {
         if (index !in 0 until document.size) return
-        val previous = document[index]
-        val deletedNumber = MarkdownEditing.orderedNumber(previous)
-        val deletedIndent = MarkdownEditing.orderedIndent(previous)
-        document.update(index, source)
-        val nextIndent = document.getOrNull(index + 1)?.let(MarkdownEditing::orderedIndent)
-        val renumbered = deletedNumber != null && !MarkdownEditing.isOrderedLine(source) &&
-            nextIndent == deletedIndent &&
-            document.renumberOrderedListAt(index + 1, startingNumber = deletedNumber)
-        recordHistory(kind, index, selectionEnd, selectionStart)
+        val update = document.updateWithOrderedListReconciliation(
+            index,
+            source,
+            selectionStart,
+            selectionEnd
+        )
+        recordHistory(kind, index, update.edit.selectionEnd, update.edit.selectionStart)
         updateMarkdownToolbar()
-        if (renumbered) {
+        if (update.renumbered) {
             refreshRows(
                 requestFocus = true,
-                cursorPosition = selectionEnd,
-                selectionStart = selectionStart
+                cursorPosition = update.edit.selectionEnd,
+                selectionStart = update.edit.selectionStart
             )
         }
         scheduleSave()

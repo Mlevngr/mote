@@ -41,7 +41,7 @@
         <item name="android:navigationBarColor">#1E1E2E</item>
         <item name="android:statusBarColor">#1E1E2E</item>
         <item name="inkNoteAppBackground">#1E1E2E</item>
-        <item name="inkNoteToolbarBackground">#181825</item>
+        <item name="inkNoteToolbarBackground">#11111B</item>
         <item name="inkNoteEditorBackground">#313244</item>
         <item name="inkNoteEditorBorder">#585B70</item>
         <item name="inkNotePreviewBackground">#1E1E2E</item>
@@ -57,7 +57,7 @@
         <item name="colorOnPrimary">#1A1B26</item>
         <item name="colorSecondary">#BB9AF7</item>
         <item name="colorSurface">#1A1B26</item>
-        <item name="colorSurfaceContainer">#24283B</item>
+        <item name="colorSurfaceContainer">#202330</item>
         <item name="colorOnSurface">#A9B1D6</item>
         <item name="colorOutline">#414868</item>
         <item name="android:windowBackground">#1A1B26</item>
@@ -68,33 +68,33 @@
         <item name="inkNoteEditorBackground">#24283B</item>
         <item name="inkNoteEditorBorder">#414868</item>
         <item name="inkNotePreviewBackground">#1A1B26</item>
-        <item name="inkNoteCardBackground">#24283B</item>
+        <item name="inkNoteCardBackground">#202330</item>
         <item name="inkNoteTextPrimary">#A9B1D6</item>
         <item name="inkNoteTextSecondary">#9AA5CE</item>
         <item name="inkNoteErrorText">#F7768E</item>
-        <item name="inkNoteIconColor">#BB9AF7</item>
+        <item name="inkNoteIconColor">#7AA2F7</item>
     </style>
 
     <style name="Theme.InkNote.Minimal" parent="Theme.InkNote.Base">
-        <item name="colorPrimary">#A8A8FF</item>
+        <item name="colorPrimary">#A78BFA</item>
         <item name="colorOnPrimary">#111111</item>
-        <item name="colorSecondary">#A8A8FF</item>
-        <item name="colorSurface">#0A0A0A</item>
-        <item name="colorSurfaceContainer">#171717</item>
-        <item name="colorOnSurface">#EDEDED</item>
-        <item name="colorOutline">#3B3B3B</item>
-        <item name="android:windowBackground">#0A0A0A</item>
-        <item name="android:navigationBarColor">#0A0A0A</item>
-        <item name="android:statusBarColor">#171717</item>
-        <item name="inkNoteAppBackground">#0A0A0A</item>
-        <item name="inkNoteToolbarBackground">#171717</item>
-        <item name="inkNoteEditorBackground">#202020</item>
-        <item name="inkNoteEditorBorder">#525252</item>
-        <item name="inkNotePreviewBackground">#0A0A0A</item>
-        <item name="inkNoteCardBackground">#171717</item>
-        <item name="inkNoteTextPrimary">#EDEDED</item>
-        <item name="inkNoteTextSecondary">#A0A0A0</item>
+        <item name="colorSecondary">#A78BFA</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorSurfaceContainer">#161616</item>
+        <item name="colorOnSurface">#DCDCDC</item>
+        <item name="colorOutline">#333333</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="inkNoteAppBackground">#000000</item>
+        <item name="inkNoteToolbarBackground">#111111</item>
+        <item name="inkNoteEditorBackground">#161616</item>
+        <item name="inkNoteEditorBorder">#333333</item>
+        <item name="inkNotePreviewBackground">#000000</item>
+        <item name="inkNoteCardBackground">#161616</item>
+        <item name="inkNoteTextPrimary">#DCDCDC</item>
+        <item name="inkNoteTextSecondary">#999999</item>
         <item name="inkNoteErrorText">#FFB4AB</item>
-        <item name="inkNoteIconColor">#A78BFA</item>
+        <item name="inkNoteIconColor">#DCDCDC</item>
     </style>
 </resources>
