@@ -5,6 +5,13 @@ data class MarkdownLineUpdateResult(
     val renumbered: Boolean
 )
 
+data class PdfPageNoteRemoval(
+    val startLine: Int,
+    val removedLineCount: Int,
+    val focusLine: Int?,
+    val focusCursor: Int
+)
+
 /** A lossless, line-oriented Markdown model used by the hybrid editor. */
 class MarkdownDocument private constructor(private val lines: MutableList<String>) {
     val size: Int get() = lines.size
@@ -166,6 +173,47 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         repeat(count) { lines.removeAt(embedLine) }
         if (lines.isEmpty()) lines += ""
         return count
+    }
+
+    /** Removes a blank page-note line, including its container when no content remains. */
+    fun removeEmptyPdfPageNoteAt(contentLine: Int): PdfPageNoteRemoval? {
+        val block = PdfPageNotes.blockContaining(lines, contentLine) ?: return null
+        if (!lines[contentLine].isBlank()) return null
+        if (block.contentLines.any { !lines[it].isBlank() }) {
+            lines.removeAt(contentLine)
+            val nextContentLine = contentLine.takeIf { it < block.endLine - 1 }
+            val previousContentLine = (contentLine - 1).takeIf { it in block.contentLines }
+            val focus = nextContentLine ?: previousContentLine
+            return PdfPageNoteRemoval(
+                startLine = contentLine,
+                removedLineCount = 1,
+                focusLine = focus,
+                focusCursor = if (focus == previousContentLine) {
+                    previousContentLine?.let { lines[it].length } ?: 0
+                } else 0
+            )
+        }
+
+        val count = block.endLine - block.startLine + 1
+        repeat(count) { lines.removeAt(block.startLine) }
+        if (lines.isEmpty()) lines += ""
+
+        val forward = (block.startLine until lines.size).firstOrNull(::isEditableContentLine)
+        if (forward != null) {
+            return PdfPageNoteRemoval(block.startLine, count, forward, 0)
+        }
+        val backward = (block.startLine - 1 downTo 0).firstOrNull(::isEditableContentLine)
+        return PdfPageNoteRemoval(
+            startLine = block.startLine,
+            removedLineCount = count,
+            focusLine = backward,
+            focusCursor = backward?.let { lines[it].length } ?: 0
+        )
+    }
+
+    private fun isEditableContentLine(index: Int): Boolean {
+        val source = lines[index]
+        return !PdfPageNotes.isMarker(source) && MarkdownAssetParser.parseAssetEmbed(source) == null
     }
 
     /** Pastes source at an exact boundary between lines. Boundary 0 is document start. */

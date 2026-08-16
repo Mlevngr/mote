@@ -564,10 +564,31 @@ class EditorActivity : AppCompatActivity() {
 
     private fun mergeWithPrevious(index: Int): Boolean {
         if (mode != EditorMode.Edit) return false
-        if (document.getOrNull(index - 1)?.let(PdfPageNotes::isMarker) == true) return false
         updateHistoryFocus(
             MarkdownEditResult(document[index], 0, 0)
         )
+        document.removeEmptyPdfPageNoteAt(index)?.let { removal ->
+            activeLine = removal.focusLine
+            lastActiveLine = removal.focusLine
+                ?: removal.startLine.coerceAtMost(document.size - 1)
+            if (removal.focusLine == null) mode = EditorMode.Read
+            recordHistory(
+                MarkdownHistoryKind.Structural,
+                removal.focusLine,
+                removal.focusCursor
+            )
+            updateModeButton()
+            updateTitleInteraction()
+            updateMarkdownToolbar()
+            updateHistoryButtons()
+            refreshRows(
+                requestFocus = removal.focusLine != null,
+                cursorPosition = removal.focusCursor
+            )
+            scheduleSave()
+            return true
+        }
+        if (document.getOrNull(index - 1)?.let(PdfPageNotes::isMarker) == true) return false
         val deletedLine = document.getOrNull(index)
         val deletedNumber = deletedLine?.let(MarkdownEditing::orderedNumber)
         val deletedIndent = deletedLine?.let(MarkdownEditing::orderedIndent)

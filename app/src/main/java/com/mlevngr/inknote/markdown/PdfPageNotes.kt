@@ -58,6 +58,12 @@ object PdfPageNotes {
         return Section(embedLine, instanceId, blocks, cursor)
     }
 
+    fun blockContaining(lines: List<String>, contentLine: Int): Block? =
+        lines.indices.asSequence()
+            .mapNotNull { sectionAt(lines, it) }
+            .flatMap { it.blocks.asSequence() }
+            .firstOrNull { contentLine in it.contentLines }
+
     fun rekey(source: String, newInstanceId: String): String {
         val lines = source.split('\n').toMutableList()
         val embed = lines.firstOrNull()?.let(MarkdownAssetParser::parseAssetEmbed)
