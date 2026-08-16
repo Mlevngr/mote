@@ -11,6 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.w3c.dom.Element
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -245,10 +246,13 @@ internal data class ParsedWebDavResource(
 
 internal object WebDavXmlParser {
     fun parse(input: InputStream): List<ParsedWebDavResource> {
+        val xml = BoundedInputStream(input, MAX_XML_BYTES).readBytes()
+        require(!xml.toString(Charsets.ISO_8859_1).contains("<!DOCTYPE", ignoreCase = true)) {
+            "WebDAV XML 不允许 DOCTYPE"
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
-            isXIncludeAware = false
-            setExpandEntityReferences(false)
+            runCatching { setExpandEntityReferences(false) }
             runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
             runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
             runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
@@ -256,7 +260,7 @@ internal object WebDavXmlParser {
             runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
             runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "") }
         }
-        val document = factory.newDocumentBuilder().parse(BoundedInputStream(input, MAX_XML_BYTES))
+        val document = factory.newDocumentBuilder().parse(ByteArrayInputStream(xml))
         val responses = document.getElementsByTagNameNS("*", "response")
         return buildList {
             for (index in 0 until responses.length) {
