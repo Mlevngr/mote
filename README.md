@@ -4,9 +4,9 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 44）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r13/Mote-0.8.0-r13.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（内部构建号 45）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r14/Mote-0.8.0-r14.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r13/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r14/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 

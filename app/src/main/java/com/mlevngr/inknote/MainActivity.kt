@@ -23,6 +23,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -40,6 +41,7 @@ import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.library.TrashPreferences
 import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
+import com.mlevngr.inknote.ui.FolderStripAdapter
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -47,12 +49,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class MainActivity : AppCompatActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var adapter: NoteLibraryAdapter
+    private lateinit var folderAdapter: FolderStripAdapter
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var libraryTitle: TextView
     private lateinit var drawer: DrawerLayout
     private lateinit var navigateUpButton: AppCompatImageButton
     private lateinit var emptyView: TextView
+    private lateinit var folderSection: View
     private lateinit var recyclerView: RecyclerView
     private var currentFolder = FolderLocation.Root
     private val io = Executors.newSingleThreadExecutor()
@@ -64,7 +68,10 @@ class MainActivity : AppCompatActivity() {
         appearance.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_library)
-        SystemBarInsets.install(findViewById(R.id.library_root))
+        SystemBarInsets.install(
+            root = findViewById(R.id.library_root),
+            topInsetTarget = findViewById(R.id.library_app_bar)
+        )
 
         library = NoteLibrary(this)
         trashPreferences = TrashPreferences(this)
@@ -74,16 +81,27 @@ class MainActivity : AppCompatActivity() {
                 ?.let { FolderLocation(it.toList()) }
         }.getOrNull() ?: FolderLocation.Root
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
+        folderAdapter = FolderStripAdapter(this, ::openEntry, ::showEntryActions)
         libraryTitle = findViewById(R.id.library_title)
         drawer = findViewById(R.id.library_root)
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        val openDrawer = View.OnClickListener { drawer.openDrawer(GravityCompat.START) }
-        findViewById<View>(R.id.open_drawer).setOnClickListener(openDrawer)
-        libraryTitle.setOnClickListener(openDrawer)
+        findViewById<View>(R.id.open_drawer).setOnClickListener {
+            drawer.openDrawer(GravityCompat.START)
+        }
         navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
             button.setOnClickListener { navigateUp() }
         }
         emptyView = findViewById(R.id.empty_library)
+        folderSection = findViewById(R.id.folder_section)
+        findViewById<RecyclerView>(R.id.folder_strip).apply {
+            layoutManager = LinearLayoutManager(
+                this@MainActivity,
+                LinearLayoutManager.HORIZONTAL,
+                false
+            )
+            adapter = folderAdapter
+            itemAnimator = null
+        }
         recyclerView = findViewById<RecyclerView>(R.id.library_list).apply {
             adapter = this@MainActivity.adapter
             itemAnimator = null
@@ -157,7 +175,11 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
-                adapter.submit(entries, appearance.libraryLayout, appearance.notePreview)
+                val folders = entries.filter { it.type == NoteLibrary.EntryType.Folder }
+                val notes = entries.filter { it.type == NoteLibrary.EntryType.Note }
+                folderAdapter.submit(folders)
+                folderSection.visibility = if (folders.isEmpty()) View.GONE else View.VISIBLE
+                adapter.submit(notes, appearance.libraryLayout, appearance.notePreview)
                 emptyView.visibility = if (entries.isEmpty()) android.view.View.VISIBLE
                 else android.view.View.GONE
                 libraryTitle.text = currentFolder.title ?: getString(R.string.app_name)
