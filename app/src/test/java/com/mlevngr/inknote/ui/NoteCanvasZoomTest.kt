@@ -45,6 +45,13 @@ class NoteCanvasZoomTest {
         assertEquals(enlarged, settle(enlarged))
     }
 
+    @Test fun previewResolutionTracksLargeCanvasZoomInStableBuckets() {
+        assertEquals(1f, NoteCanvasZoom.previewRenderScale(1f), 0.001f)
+        assertEquals(2f, NoteCanvasZoom.previewRenderScale(2.2f), 0.001f)
+        assertEquals(4f, NoteCanvasZoom.previewRenderScale(4.2f), 0.001f)
+        assertEquals(6f, NoteCanvasZoom.previewRenderScale(5.5f), 0.001f)
+    }
+
     private fun update(
         current: NoteCanvasZoom.Transform,
         factor: Float,

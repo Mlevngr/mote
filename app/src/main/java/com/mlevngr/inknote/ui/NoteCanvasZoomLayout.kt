@@ -2,6 +2,8 @@ package com.mlevngr.inknote.ui
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Matrix
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -19,8 +21,12 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
     private var lastFocusX = 0f
     private var lastFocusY = 0f
     private var reboundAnimator: ValueAnimator? = null
+    private val inverseTouchMatrix = Matrix()
+    private val inverseTouchValues = FloatArray(9).apply { this[8] = 1f }
 
     val currentScale: Float get() = transform.scale
+
+    var onScaleChanged: ((Float) -> Unit)? = null
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -40,15 +46,39 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
         if (isEmpty()) return
         val content = getChildAt(0)
         content.layout(0, 0, content.measuredWidth, content.measuredHeight)
-        content.pivotX = 0f
-        content.pivotY = 0f
-        applyTransform()
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
         transform = NoteCanvasZoom.constrain(transform, width.toFloat(), height.toFloat())
-        applyTransform()
+        invalidate()
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        val checkpoint = canvas.save()
+        canvas.translate(transform.translationX, transform.translationY)
+        canvas.scale(transform.scale, transform.scale)
+        super.dispatchDraw(canvas)
+        canvas.restoreToCount(checkpoint)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.pointerCount >= 2 || pinching || transform == NoteCanvasZoom.Transform()) {
+            return super.dispatchTouchEvent(event)
+        }
+        val mapped = MotionEvent.obtain(event)
+        val inverseScale = 1f / transform.scale
+        inverseTouchValues[0] = inverseScale
+        inverseTouchValues[2] = -transform.translationX * inverseScale
+        inverseTouchValues[4] = inverseScale
+        inverseTouchValues[5] = -transform.translationY * inverseScale
+        inverseTouchMatrix.setValues(inverseTouchValues)
+        mapped.transform(inverseTouchMatrix)
+        return try {
+            super.dispatchTouchEvent(mapped)
+        } finally {
+            mapped.recycle()
+        }
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
@@ -145,18 +175,10 @@ class NoteCanvasZoomLayout @JvmOverloads constructor(
 
     private fun setTransform(value: NoteCanvasZoom.Transform) {
         if (value == transform) return
+        val scaleChanged = value.scale != transform.scale
         transform = value
-        applyTransform()
-    }
-
-    private fun applyTransform() {
-        if (isEmpty()) return
-        getChildAt(0).apply {
-            scaleX = transform.scale
-            scaleY = transform.scale
-            translationX = transform.translationX
-            translationY = transform.translationY
-        }
+        invalidate()
+        if (scaleChanged) onScaleChanged?.invoke(value.scale)
     }
 
     private fun span(event: MotionEvent): Float {

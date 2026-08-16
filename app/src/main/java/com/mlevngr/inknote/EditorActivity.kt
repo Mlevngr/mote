@@ -41,6 +41,7 @@ import com.mlevngr.inknote.markdown.PdfPageNotes
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
+import com.mlevngr.inknote.ui.NoteCanvasZoomLayout
 import com.mlevngr.inknote.ui.PreviewRowFactory
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
@@ -70,6 +71,7 @@ class EditorActivity : AppCompatActivity() {
     private var activeLine: Int? = null
     private var lastActiveLine = 0
     private var saveTask: Runnable? = null
+    private var previewScaleTask: Runnable? = null
     private var noteName = ""
     private var pendingAssetTransfer: AssetTransfer? = null
     private val workspaceLock = Any()
@@ -136,6 +138,13 @@ class EditorActivity : AppCompatActivity() {
             onAppendAtEnd = ::appendLineAtEnd,
             onBackFromIme = ::handleBackNavigation
         )
+        findViewById<NoteCanvasZoomLayout>(R.id.note_canvas).onScaleChanged = { scale ->
+            previewScaleTask?.let(main::removeCallbacks)
+            previewScaleTask = Runnable {
+                previewScaleTask = null
+                noteAdapter.setCanvasScale(scale)
+            }.also { main.postDelayed(it, PREVIEW_SCALE_DEBOUNCE_MS) }
+        }
 
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
             title = ""
@@ -955,6 +964,7 @@ class EditorActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         saveTask?.let(main::removeCallbacks)
+        previewScaleTask?.let(main::removeCallbacks)
         if (::noteAdapter.isInitialized) noteAdapter.close()
         io.shutdown()
         super.onDestroy()
@@ -970,6 +980,7 @@ class EditorActivity : AppCompatActivity() {
     companion object {
         private const val DISABLED_ALPHA = 0.38f
         private const val SAVE_DELAY_MS = 350L
+        private const val PREVIEW_SCALE_DEBOUNCE_MS = 100L
         private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"
         fun intent(

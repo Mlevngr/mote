@@ -2,7 +2,7 @@ package com.mlevngr.inknote.ui
 
 object NoteCanvasZoom {
     const val MIN_GESTURE_SCALE = 0.75f
-    const val MAX_SCALE = 2.5f
+    const val MAX_SCALE = 6f
 
     data class Transform(
         val scale: Float = 1f,
@@ -60,5 +60,14 @@ object NoteCanvasZoom {
             translationX = transform.translationX.coerceIn(minimumX, 0f),
             translationY = transform.translationY.coerceIn(minimumY, 0f)
         )
+    }
+
+    fun previewRenderScale(scale: Float): Float = when {
+        scale <= 1.25f -> 1f
+        scale <= 1.75f -> 1.5f
+        scale <= 2.5f -> 2f
+        scale <= 3.5f -> 3f
+        scale <= 5f -> 4f
+        else -> 6f
     }
 }

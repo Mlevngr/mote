@@ -43,6 +43,7 @@ import io.noties.markwon.ext.tasklist.TaskListPlugin
 import java.io.Closeable
 import java.io.File
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class HybridNoteAdapter(
     private val context: Context,
@@ -83,8 +84,10 @@ class HybridNoteAdapter(
     private var activeEditor: LineEditText? = null
     private var activeEditorLine: Int? = null
     private var pendingEdit: PendingEdit? = null
+    private var previewRenderScale = 1f
     private val horizontalPadding = dp(18)
-    private val targetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
+    private val baseTargetWidth get() = context.resources.displayMetrics.widthPixels - dp(36)
+    private val previewTargetWidth get() = (baseTargetWidth * previewRenderScale).roundToInt()
 
     fun submit(
         newRows: List<HybridRow>,
@@ -144,6 +147,13 @@ class HybridNoteAdapter(
         if (assetPastePending == pending) return
         assetPastePending = pending
         notifyDataSetChanged()
+    }
+
+    fun setCanvasScale(scale: Float) {
+        val nextRenderScale = NoteCanvasZoom.previewRenderScale(scale)
+        if (nextRenderScale == previewRenderScale) return
+        previewRenderScale = nextRenderScale
+        notifyItemRangeChanged(0, rows.size, PAYLOAD_PREVIEW_QUALITY)
     }
 
     fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
@@ -275,6 +285,23 @@ class HybridNoteAdapter(
             return
         }
         bindContent(holder, rows[position])
+    }
+
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        if (PAYLOAD_PREVIEW_QUALITY in payloads && position < rows.size) {
+            val row = rows[position] as? HybridRow.Rendered
+            when (val preview = row?.preview) {
+                is PreviewRow.Image -> bindImage(holder as AssetHolder, row.lineIndex, preview)
+                is PreviewRow.PdfPage -> bindPdf(holder as AssetHolder, row.lineIndex, preview)
+                else -> Unit
+            }
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     private fun bindContent(holder: RecyclerView.ViewHolder, row: HybridRow) {
@@ -473,8 +500,9 @@ class HybridNoteAdapter(
             holder.image.setImageDrawable(null)
             return
         }
-        val key = "image:${row.file.path}:${row.file.lastModified()}:$targetWidth"
-        loadBitmap(holder, key) { decodeImage(row.file, targetWidth) }
+        val width = previewTargetWidth
+        val key = "image:${row.file.path}:${row.file.lastModified()}:$width"
+        loadBitmap(holder, key) { decodeImage(row.file, width) }
     }
 
     private fun bindPdf(holder: AssetHolder, lineIndex: Int, row: PreviewRow.PdfPage) {
@@ -522,12 +550,13 @@ class HybridNoteAdapter(
             holder.image.setImageDrawable(null)
             return
         }
-        val key = "pdf:${row.file.path}:${row.file.lastModified()}:${row.pageIndex}:$targetWidth"
+        val width = previewTargetWidth
+        val key = "pdf:${row.file.path}:${row.file.lastModified()}:${row.pageIndex}:$width"
         loadBitmap(holder, key) {
             val source = synchronized(pdfSources) {
                 pdfSources.getOrPut(row.file.path) { PdfDocumentSource(row.file) }
             }
-            source.render(row.pageIndex, targetWidth)
+            source.render(row.pageIndex, width)
         }
     }
 
@@ -866,6 +895,7 @@ class HybridNoteAdapter(
     }
 
     private companion object {
+        const val PAYLOAD_PREVIEW_QUALITY = "preview_quality"
         const val TYPE_EDITOR = 0
         const val TYPE_MARKDOWN = 1
         const val TYPE_IMAGE = 2
