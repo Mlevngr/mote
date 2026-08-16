@@ -43,41 +43,56 @@
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
 
-    <com.mlevngr.inknote.ui.ImeBackTextInputEditText
-        android:id="@+id/note_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/inkNoteToolbarBackground"
-        android:ellipsize="end"
-        android:hint="@string/note_title_hint"
-        android:imeOptions="actionDone"
-        android:inputType="textCapSentences"
-        android:maxLines="1"
-        android:paddingStart="18dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="14dp"
-        android:singleLine="true"
-        android:textColor="?attr/inkNoteTextPrimary"
-        android:textColorHint="?attr/inkNoteTextSecondary"
-        android:textSize="28sp"
-        android:textStyle="bold" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:alpha="0.35"
-        android:background="?attr/colorOutline" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/note_content"
+    <com.mlevngr.inknote.ui.NoteCanvasZoomLayout
+        android:id="@+id/note_canvas"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingTop="6dp"
-        android:paddingBottom="32dp"
-        android:scrollbars="vertical" />
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <com.mlevngr.inknote.ui.ImeBackTextInputEditText
+                android:id="@+id/note_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/inkNoteToolbarBackground"
+                android:ellipsize="end"
+                android:hint="@string/note_title_hint"
+                android:imeOptions="actionDone"
+                android:inputType="textCapSentences"
+                android:maxLines="1"
+                android:paddingStart="18dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="14dp"
+                android:singleLine="true"
+                android:textColor="?attr/inkNoteTextPrimary"
+                android:textColorHint="?attr/inkNoteTextSecondary"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:alpha="0.35"
+                android:background="?attr/colorOutline" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/note_content"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingTop="6dp"
+                android:paddingBottom="32dp"
+                android:scrollbars="vertical" />
+
+        </LinearLayout>
+
+    </com.mlevngr.inknote.ui.NoteCanvasZoomLayout>
 
     <HorizontalScrollView
         android:id="@+id/markdown_toolbar"

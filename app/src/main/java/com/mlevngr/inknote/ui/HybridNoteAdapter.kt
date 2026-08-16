@@ -23,7 +23,6 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
@@ -76,7 +75,6 @@ class HybridNoteAdapter(
     private var rows: List<HybridRow> = emptyList()
     private val collapsedAssets = mutableSetOf<AssetInstanceKey>()
     private val collapsedPdfPages = mutableSetOf<PdfPreviewVisibility.PageKey>()
-    private val pdfZoomStates = mutableMapOf<PdfPreviewVisibility.PageKey, PdfPageZoom.State>()
     private var assetPastePending = false
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
@@ -106,7 +104,6 @@ class HybridNoteAdapter(
             PdfPreviewVisibility.PageKey(instanceKey, preview.pageIndex)
         }.toSet()
         collapsedPdfPages.retainAll(availablePages)
-        pdfZoomStates.keys.retainAll(availablePages)
         this.editing = editing
         this.focusLine = focusLine
         this.focusCursor = focusCursor
@@ -417,7 +414,6 @@ class HybridNoteAdapter(
             holder.documentToggle.setOnClickListener(null)
             holder.pageNote.setOnClickListener(null)
             holder.image.setOnLongClickListener(null)
-            holder.image.disablePdfZoom()
             holder.image.tag = null
             holder.image.setImageDrawable(null)
         }
@@ -461,7 +457,6 @@ class HybridNoteAdapter(
     }
 
     private fun bindImage(holder: AssetHolder, lineIndex: Int, row: PreviewRow.Image) {
-        holder.image.disablePdfZoom()
         holder.documentToggle.visibility = View.GONE
         holder.pageNote.visibility = View.GONE
         val collapsed = isCollapsed(lineIndex, row.file)
@@ -523,18 +518,10 @@ class HybridNoteAdapter(
         val previewVisible = !documentCollapsed && !pageCollapsed
         holder.image.visibility = if (previewVisible) View.VISIBLE else View.GONE
         if (!previewVisible) {
-            holder.image.disablePdfZoom()
             holder.image.tag = null
             holder.image.setImageDrawable(null)
             return
         }
-        holder.image.configurePdfZoom(
-            state = pdfZoomStates[pageKey] ?: PdfPageZoom.State(),
-            onChanged = { pdfZoomStates[pageKey] = it },
-            onDoubleTap = {
-                if (!editing) onPreviewDoubleTap(lineIndex)
-            }
-        )
         val key = "pdf:${row.file.path}:${row.file.lastModified()}:${row.pageIndex}:$targetWidth"
         loadBitmap(holder, key) {
             val source = synchronized(pdfSources) {
@@ -836,19 +823,11 @@ class HybridNoteAdapter(
             )
             setBackgroundResource(backgroundValue.resourceId)
         }
-        val image = ZoomablePdfImageView(container.context).apply {
+        val image = ImageView(container.context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(ThemeColors.resolve(container.context, R.attr.inkNotePreviewBackground))
             contentDescription = "Embedded note asset"
-        }
-        private val imageViewport = FrameLayout(container.context).apply {
-            clipChildren = true
-            clipToPadding = true
-            addView(image, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ))
         }
         val pageNote = TextView(container.context).apply {
             setTextColor(ThemeColors.resolve(container.context, androidx.appcompat.R.attr.colorPrimary))
@@ -875,7 +854,7 @@ class HybridNoteAdapter(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))
-            container.addView(imageViewport, LinearLayout.LayoutParams(
+            container.addView(image, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))
