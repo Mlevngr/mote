@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -76,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         libraryTitle = findViewById(R.id.library_title)
         drawer = findViewById(R.id.library_root)
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        findViewById<AppCompatImageButton>(R.id.open_drawer).setOnClickListener {
+        findViewById<View>(R.id.open_drawer).setOnClickListener {
             drawer.openDrawer(GravityCompat.START)
         }
         navigateUpButton = findViewById<AppCompatImageButton>(R.id.navigate_up).also { button ->
@@ -120,6 +121,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
         refresh()
+        introduceNavigationDrawer()
     }
 
     override fun onResume() {
@@ -178,6 +180,20 @@ class MainActivity : AppCompatActivity() {
             if (appearance.libraryLayout == LibraryLayoutMode.List) 4.dp else 8.dp,
             24.dp
         )
+    }
+
+    /**
+     * Open the drawer once after this navigation fix is installed. Besides introducing the
+     * feature, this makes an incorrectly installed older APK immediately obvious to the user.
+     */
+    private fun introduceNavigationDrawer() {
+        val preferences = getSharedPreferences(NAVIGATION_PREFERENCES, MODE_PRIVATE)
+        if (preferences.getBoolean(DRAWER_INTRODUCTION_KEY, false)) return
+        drawer.post {
+            if (isFinishing || isDestroyed) return@post
+            drawer.openDrawer(GravityCompat.START)
+            preferences.edit().putBoolean(DRAWER_INTRODUCTION_KEY, true).apply()
+        }
     }
 
     private fun showAppearanceDialog() {
@@ -693,5 +709,7 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val STATE_FOLDER = "current_folder"
+        const val NAVIGATION_PREFERENCES = "navigation_ui"
+        const val DRAWER_INTRODUCTION_KEY = "drawer_introduction_build_43"
     }
 }
