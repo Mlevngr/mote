@@ -53,6 +53,7 @@ class HybridNoteAdapter(
     private val onMultilineInput: (Int, String, Int) -> Unit,
     private val onMergeWithPrevious: (Int) -> Boolean,
     private val onAssetActions: (Int, File, String) -> Unit,
+    private val onAddPdfPageNote: (Int, Int) -> Unit,
     private val onPasteAt: (Int?) -> Unit,
     private val onPasteAtBoundary: (Int) -> Unit,
     private val onAppendAtEnd: () -> Unit,
@@ -73,6 +74,7 @@ class HybridNoteAdapter(
     private var allRows: List<HybridRow> = emptyList()
     private var rows: List<HybridRow> = emptyList()
     private val collapsedAssets = mutableSetOf<AssetInstanceKey>()
+    private val collapsedPdfPages = mutableSetOf<PdfPreviewVisibility.PageKey>()
     private var assetPastePending = false
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
@@ -91,9 +93,17 @@ class HybridNoteAdapter(
         focusCursor: Int? = null,
         focusSelectionStart: Int? = null
     ) {
+        migratePdfCollapseKeys(allRows, newRows)
         allRows = newRows
         val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetKey).toSet()
         collapsedAssets.retainAll(availableAssets)
+        val availablePages = newRows.mapNotNull { row ->
+            val preview = (row as? HybridRow.Rendered)?.preview as? PreviewRow.PdfPage
+                ?: return@mapNotNull null
+            val instanceKey = preview.instanceKey ?: return@mapNotNull null
+            PdfPreviewVisibility.PageKey(instanceKey, preview.pageIndex)
+        }.toSet()
+        collapsedPdfPages.retainAll(availablePages)
         this.editing = editing
         this.focusLine = focusLine
         this.focusCursor = focusCursor
@@ -101,6 +111,33 @@ class HybridNoteAdapter(
         if (!editing) pendingEdit = null
         rebuildVisibleRows()
         notifyDataSetChanged()
+    }
+
+    private fun migratePdfCollapseKeys(
+        oldRows: List<HybridRow>,
+        newRows: List<HybridRow>
+    ) {
+        fun identities(rows: List<HybridRow>): Map<Pair<Int, String>, String> =
+            rows.mapNotNull { row ->
+                val page = (row as? HybridRow.Rendered)?.preview as? PreviewRow.PdfPage
+                    ?: return@mapNotNull null
+                val identity = page.instanceKey
+                    ?: "legacy:${row.lineIndex}:${page.file.canonicalPath}"
+                (row.lineIndex to page.file.canonicalPath) to identity
+            }.toMap()
+
+        val oldIdentities = identities(oldRows)
+        val newIdentities = identities(newRows)
+        oldIdentities.forEach { (location, oldIdentity) ->
+            val newIdentity = newIdentities[location] ?: return@forEach
+            if (oldIdentity == newIdentity) return@forEach
+            if (collapsedAssets.remove(AssetInstanceKey(oldIdentity))) {
+                collapsedAssets += AssetInstanceKey(newIdentity)
+            }
+            val migratedPages = collapsedPdfPages.filter { it.instanceKey == oldIdentity }
+            collapsedPdfPages.removeAll(migratedPages.toSet())
+            collapsedPdfPages += migratedPages.map { it.copy(instanceKey = newIdentity) }
+        }
     }
 
     fun setAssetPastePending(pending: Boolean) {
@@ -371,6 +408,8 @@ class HybridNoteAdapter(
             holder.caption.setOnClickListener(null)
             holder.caption.setOnLongClickListener(null)
             holder.menu.setOnClickListener(null)
+            holder.documentToggle.setOnClickListener(null)
+            holder.pageNote.setOnClickListener(null)
             holder.image.tag = null
             holder.image.setImageDrawable(null)
         }
@@ -414,6 +453,8 @@ class HybridNoteAdapter(
     }
 
     private fun bindImage(holder: AssetHolder, lineIndex: Int, row: PreviewRow.Image) {
+        holder.documentToggle.visibility = View.GONE
+        holder.pageNote.visibility = View.GONE
         val collapsed = isCollapsed(lineIndex, row.file)
         bindAssetHeader(
             holder,
@@ -433,15 +474,46 @@ class HybridNoteAdapter(
     }
 
     private fun bindPdf(holder: AssetHolder, lineIndex: Int, row: PreviewRow.PdfPage) {
-        val collapsed = isCollapsed(lineIndex, row.file)
-        val pageLabel = if (collapsed) {
+        val instanceKey = row.instanceKey
+            ?: "legacy:$lineIndex:${row.file.canonicalPath}"
+        val documentKey = AssetInstanceKey(instanceKey)
+        val documentCollapsed = documentKey in collapsedAssets
+        val pageKey = PdfPreviewVisibility.PageKey(instanceKey, row.pageIndex)
+        val pageCollapsed = !PdfPreviewVisibility.isPageExpanded(pageKey, collapsedPdfPages)
+        val pageLabel = if (documentCollapsed) {
             "${row.label}  •  ${context.getString(R.string.pdf_page_count, row.pageCount)}"
         } else {
             "${row.label}  •  ${row.pageIndex + 1}/${row.pageCount}"
         }
-        bindAssetHeader(holder, lineIndex, row.file, pageLabel, collapsed)
-        holder.image.visibility = if (collapsed) View.GONE else View.VISIBLE
-        if (collapsed) {
+        holder.caption.text = "${if (documentCollapsed || pageCollapsed) '▶' else '▼'}  $pageLabel"
+        holder.caption.contentDescription = context.getString(
+            if (documentCollapsed || pageCollapsed) R.string.expand_pdf_page
+            else R.string.collapse_pdf_page,
+            row.pageIndex + 1
+        )
+        holder.caption.setOnClickListener {
+            if (documentCollapsed) togglePdfDocument(documentKey)
+            else togglePdfPage(pageKey)
+        }
+        holder.documentToggle.visibility = if (row.pageIndex == 0) View.VISIBLE else View.GONE
+        holder.documentToggle.setImageResource(
+            if (documentCollapsed) R.drawable.ic_unfold_more_24 else R.drawable.ic_unfold_less_24
+        )
+        holder.documentToggle.contentDescription = context.getString(
+            if (documentCollapsed) R.string.expand_entire_pdf else R.string.collapse_entire_pdf
+        )
+        holder.documentToggle.setOnClickListener { togglePdfDocument(documentKey) }
+        holder.pageNote.visibility = if (editing && !documentCollapsed) View.VISIBLE else View.GONE
+        holder.pageNote.text = context.getString(R.string.add_pdf_page_note)
+        holder.pageNote.contentDescription = context.getString(
+            R.string.add_pdf_page_note_for_page,
+            row.pageIndex + 1
+        )
+        holder.pageNote.setOnClickListener { onAddPdfPageNote(lineIndex, row.pageIndex) }
+
+        val previewVisible = !documentCollapsed && !pageCollapsed
+        holder.image.visibility = if (previewVisible) View.VISIBLE else View.GONE
+        if (!previewVisible) {
             holder.image.tag = null
             holder.image.setImageDrawable(null)
             return
@@ -505,6 +577,17 @@ class HybridNoteAdapter(
         val key = assetKey(lineIndex, file)
         if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
         rebuildVisibleRows()
+        notifyDataSetChanged()
+    }
+
+    private fun togglePdfDocument(key: AssetInstanceKey) {
+        if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
+        rebuildVisibleRows()
+        notifyDataSetChanged()
+    }
+
+    private fun togglePdfPage(key: PdfPreviewVisibility.PageKey) {
+        if (!collapsedPdfPages.add(key)) collapsedPdfPages.remove(key)
         notifyDataSetChanged()
     }
 
@@ -724,11 +807,27 @@ class HybridNoteAdapter(
             )
             setBackgroundResource(backgroundValue.resourceId)
         }
+        val documentToggle = AppCompatImageButton(container.context).apply {
+            setColorFilter(ThemeColors.resolve(container.context, R.attr.inkNoteIconColor))
+            val backgroundValue = TypedValue()
+            container.context.theme.resolveAttribute(
+                android.R.attr.selectableItemBackgroundBorderless,
+                backgroundValue,
+                true
+            )
+            setBackgroundResource(backgroundValue.resourceId)
+        }
         val image = ImageView(container.context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(ThemeColors.resolve(container.context, R.attr.inkNotePreviewBackground))
             contentDescription = "Embedded note asset"
+        }
+        val pageNote = TextView(container.context).apply {
+            setTextColor(ThemeColors.resolve(container.context, androidx.appcompat.R.attr.colorPrimary))
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0, 0)
         }
 
         init {
@@ -736,6 +835,10 @@ class HybridNoteAdapter(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1f
+            ))
+            header.addView(documentToggle, LinearLayout.LayoutParams(
+                (40 * container.resources.displayMetrics.density).toInt(),
+                (40 * container.resources.displayMetrics.density).toInt()
             ))
             header.addView(menu, LinearLayout.LayoutParams(
                 (40 * container.resources.displayMetrics.density).toInt(),
@@ -746,6 +849,10 @@ class HybridNoteAdapter(
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))
             container.addView(image, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            container.addView(pageNote, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))

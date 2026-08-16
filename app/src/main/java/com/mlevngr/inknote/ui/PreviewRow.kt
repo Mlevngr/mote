@@ -9,7 +9,8 @@ sealed interface PreviewRow {
         val file: File,
         val label: String,
         val pageIndex: Int,
-        val pageCount: Int
+        val pageCount: Int,
+        val instanceKey: String? = null
     ) : PreviewRow
     data class Attachment(val file: File, val label: String) : PreviewRow
     data class Error(val message: String) : PreviewRow

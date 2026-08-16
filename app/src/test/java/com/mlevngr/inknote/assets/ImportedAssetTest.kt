@@ -29,4 +29,16 @@ class ImportedAssetTest {
             ImportedAsset("assets/id.bin", "a|b]", ImportedAsset.Kind.Attachment).markdown()
         )
     }
+
+    @Test fun addsStableMetadataToNewPdfInstancesWhenProvided() {
+        assertEquals(
+            "![[asset:assets/id.pdf|paper|mote-id:stable-id]]",
+            ImportedAsset(
+                "assets/id.pdf",
+                "paper",
+                ImportedAsset.Kind.Pdf,
+                "stable-id"
+            ).markdown()
+        )
+    }
 }

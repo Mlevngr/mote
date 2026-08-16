@@ -114,6 +114,60 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         if (lines.size == 1) lines[0] = "" else lines.removeAt(index)
     }
 
+    fun insertPdfPageNote(
+        embedLine: Int,
+        pageIndex: Int,
+        newInstanceId: () -> String
+    ): Int {
+        require(pageIndex >= 0) { "Page index cannot be negative" }
+        val parsed = lines.getOrNull(embedLine)?.let(MarkdownAssetParser::parseAssetEmbed)
+            ?: error("Line is not an embedded asset")
+        require(parsed.relativePath.endsWith(".pdf", ignoreCase = true)) {
+            "Asset is not a PDF"
+        }
+        val instanceId = parsed.instanceId ?: newInstanceId().also { id ->
+            lines[embedLine] = requireNotNull(MarkdownAssetParser.withInstanceId(lines[embedLine], id))
+        }
+        val section = requireNotNull(PdfPageNotes.sectionAt(lines, embedLine))
+        section.blocks.firstOrNull { it.anchor.pageIndex == pageIndex }?.let { block ->
+            val firstBlank = block.contentLines.firstOrNull { lines[it].isBlank() }
+            if (firstBlank != null) return firstBlank
+            if (!block.contentLines.isEmpty()) return block.contentLines.first
+            lines.add(block.endLine, "")
+            return block.endLine
+        }
+
+        val insertion = section.blocks.firstOrNull { it.anchor.pageIndex > pageIndex }
+            ?.startLine
+            ?: section.endExclusive
+        lines.addAll(
+            insertion,
+            listOf(
+                PdfPageNotes.startMarker(instanceId, pageIndex),
+                "",
+                PdfPageNotes.endMarker(instanceId)
+            )
+        )
+        return insertion + 1
+    }
+
+    fun assetBlockSource(embedLine: Int): String {
+        require(embedLine in lines.indices) { "Line index is out of bounds" }
+        val section = PdfPageNotes.sectionAt(lines, embedLine)
+        val endExclusive = section?.endExclusive ?: (embedLine + 1)
+        return lines.subList(embedLine, endExclusive).joinToString("\n")
+    }
+
+    /** Removes an embed and its contiguous PDF page-note blocks. Returns removed line count. */
+    fun removeAssetBlock(embedLine: Int): Int {
+        require(embedLine in lines.indices) { "Line index is out of bounds" }
+        val endExclusive = PdfPageNotes.sectionAt(lines, embedLine)?.endExclusive ?: (embedLine + 1)
+        val count = endExclusive - embedLine
+        repeat(count) { lines.removeAt(embedLine) }
+        if (lines.isEmpty()) lines += ""
+        return count
+    }
+
     /** Pastes source at an exact boundary between lines. Boundary 0 is document start. */
     fun pasteAtInsertion(boundaryIndex: Int, source: String): IntRange {
         require(boundaryIndex in 0..lines.size) { "Insertion boundary is out of bounds" }

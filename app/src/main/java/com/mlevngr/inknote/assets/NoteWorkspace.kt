@@ -72,7 +72,12 @@ class NoteWorkspace(context: Context, folderLocation: FolderLocation, private va
             temporary.outputStream().use { output -> input.copyTo(output) }
         }
         check(temporary.renameTo(destination)) { "Cannot store selected file" }
-        return ImportedAsset("assets/$fileName", displayName, kind)
+        return ImportedAsset(
+            relativePath = "assets/$fileName",
+            displayName = displayName,
+            kind = kind,
+            instanceId = if (kind == ImportedAsset.Kind.Pdf) UUID.randomUUID().toString() else null
+        )
     }
 
     private fun detectKind(mimeType: String?, displayName: String): ImportedAsset.Kind = when {

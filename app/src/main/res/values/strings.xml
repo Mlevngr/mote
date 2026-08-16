@@ -28,6 +28,13 @@
     <string name="expand_preview">展开%1$s预览</string>
     <string name="collapse_preview">收起%1$s预览</string>
     <string name="pdf_page_count">共%1$d页</string>
+    <string name="expand_pdf_page">展开 PDF 第%1$d页</string>
+    <string name="collapse_pdf_page">收起 PDF 第%1$d页</string>
+    <string name="expand_entire_pdf">展开整份 PDF 和页间笔记</string>
+    <string name="collapse_entire_pdf">收起整份 PDF 和页间笔记</string>
+    <string name="add_pdf_page_note">＋ 在本页后添加笔记</string>
+    <string name="add_pdf_page_note_for_page">在 PDF 第%1$d页后添加笔记</string>
+    <string name="add_pdf_page_note_failed">无法在这一页后添加笔记</string>
     <string name="remove_inserted_file">删除插入内容</string>
     <string name="remove_inserted_file_confirmation">确定从笔记中删除“%1$s”吗？没有其他引用时，内部文件也会删除。</string>
     <string name="asset_actions">插入内容操作</string>

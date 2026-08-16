@@ -26,6 +26,15 @@ class MarkdownAssetParserTest {
         )
     }
 
+    @Test fun keepsStablePdfInstanceMetadataOutOfTheVisibleLabel() {
+        assertEquals(
+            listOf(PreviewBlock.Pdf("assets/paper.pdf", "paper", "pdf-123")),
+            MarkdownAssetParser.parse(
+                "![[asset:assets/paper.pdf|paper|mote-id:pdf-123]]"
+            )
+        )
+    }
+
     @Test fun keepsLegacyStandardMarkdownImportsWorking() {
         assertEquals(
             listOf(

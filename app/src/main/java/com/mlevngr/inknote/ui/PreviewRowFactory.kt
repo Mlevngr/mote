@@ -29,7 +29,8 @@ class PreviewRowFactory(private val workspace: NoteWorkspace) {
                                     file = file,
                                     label = block.label.ifBlank { file.name },
                                     pageIndex = page,
-                                    pageCount = source.pageCount
+                                    pageCount = source.pageCount,
+                                    instanceKey = block.instanceId?.let { "pdf:$it" }
                                 )
                             }
                         }

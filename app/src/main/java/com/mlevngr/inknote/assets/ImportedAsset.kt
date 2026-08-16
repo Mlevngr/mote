@@ -3,7 +3,8 @@ package com.mlevngr.inknote.assets
 data class ImportedAsset(
     val relativePath: String,
     val displayName: String,
-    val kind: Kind
+    val kind: Kind,
+    val instanceId: String? = null
 ) {
     enum class Kind { Image, Pdf, Attachment }
 
@@ -15,6 +16,9 @@ data class ImportedAsset(
             .replace('|', ' ')
             .replace('[', '(')
             .replace(']', ')')
-        return "![[asset:$relativePath|$label]]"
+        val metadata = if (kind == Kind.Pdf && instanceId != null) {
+            "|mote-id:$instanceId"
+        } else ""
+        return "![[asset:$relativePath|$label$metadata]]"
     }
 }

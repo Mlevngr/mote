@@ -1,7 +1,9 @@
 package com.mlevngr.inknote.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -80,5 +82,67 @@ class AssetPreviewVisibilityTest {
             AssetPreviewVisibility.assetKey(first),
             AssetPreviewVisibility.assetKey(second)
         )
+    }
+
+    @Test fun collapsingAWholePdfAlsoHidesItsInterPageNotes() {
+        val pdf = File("/tmp/document.pdf")
+        val context = PdfRowContext("pdf:stable", 2, 0)
+        val rows = listOf(
+            HybridRow.Rendered(
+                2,
+                PreviewRow.PdfPage(pdf, "Document", 0, 2, "pdf:stable"),
+                context
+            ),
+            HybridRow.Rendered(4, PreviewRow.Markdown("Page note"), context),
+            HybridRow.Rendered(
+                2,
+                PreviewRow.PdfPage(pdf, "Document", 1, 2, "pdf:stable"),
+                context.copy(pageIndex = 1)
+            )
+        )
+
+        val visible = AssetPreviewVisibility.visibleRows(
+            rows,
+            setOf(AssetPreviewVisibility.AssetInstanceKey("pdf:stable"))
+        )
+
+        assertEquals(1, visible.size)
+        assertTrue((visible.single() as HybridRow.Rendered).preview is PreviewRow.PdfPage)
+    }
+
+    @Test fun pageCollapseOnlyHidesThatPagePreview() {
+        val first = PdfPreviewVisibility.PageKey("pdf:stable", 0)
+        val second = PdfPreviewVisibility.PageKey("pdf:stable", 1)
+
+        assertFalse(PdfPreviewVisibility.isPageExpanded(first, setOf(first)))
+        assertTrue(PdfPreviewVisibility.isPageExpanded(second, setOf(first)))
+    }
+
+    @Test fun wholePdfCollapseAlsoHidesAPdfEmbeddedInsideItsPageNote() {
+        val outer = File("/tmp/outer.pdf")
+        val inner = File("/tmp/inner.pdf")
+        val outerContext = PdfRowContext("pdf:outer", 0, 0)
+        val rows = listOf(
+            HybridRow.Rendered(
+                0,
+                PreviewRow.PdfPage(outer, "Outer", 0, 1, "pdf:outer"),
+                outerContext
+            ),
+            HybridRow.Rendered(
+                2,
+                PreviewRow.PdfPage(inner, "Inner", 0, 1, "pdf:inner"),
+                outerContext
+            )
+        )
+
+        val visible = AssetPreviewVisibility.visibleRows(
+            rows,
+            setOf(AssetPreviewVisibility.AssetInstanceKey("pdf:outer"))
+        )
+
+        assertEquals(1, visible.size)
+        assertEquals(outer, (visible.single() as HybridRow.Rendered).let {
+            (it.preview as PreviewRow.PdfPage).file
+        })
     }
 }

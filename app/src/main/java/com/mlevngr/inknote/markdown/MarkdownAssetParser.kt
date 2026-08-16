@@ -2,7 +2,9 @@ package com.mlevngr.inknote.markdown
 
 /** Parses InkNote embeds while retaining legacy standard-Markdown imports. */
 object MarkdownAssetParser {
-    private val embed = Regex("""^\s*!\[\[asset:(assets/[^|\]]+)(?:\|([^\]]*))?]]\s*$""")
+    private val embed = Regex(
+        """^\s*!\[\[asset:(assets/[^|\]]+)(?:\|([^|\]]*))?(?:\|mote-id:([A-Za-z0-9_-]+))?]]\s*$"""
+    )
     private val image = Regex("""^\s*!\[([^]]*)]\((assets/[^)]+)\)\s*$""")
     private val link = Regex("""^\s*\[([^]]*)]\((assets/[^)]+)\)\s*$""")
     private val imageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "heic", "heif")
@@ -28,7 +30,8 @@ object MarkdownAssetParser {
                     flushMarkdown()
                     val path = embedMatch.groupValues[1]
                     val label = embedMatch.groupValues[2]
-                    result += embeddedBlock(path, label)
+                    val instanceId = embedMatch.groupValues[3].ifBlank { null }
+                    result += embeddedBlock(path, label, instanceId)
                 }
                 imageMatch != null -> {
                     flushMarkdown()
@@ -47,8 +50,41 @@ object MarkdownAssetParser {
         return result
     }
 
-    private fun embeddedBlock(path: String, label: String): PreviewBlock = when (extension(path)) {
-        "pdf" -> PreviewBlock.Pdf(path, label)
+    data class AssetEmbed(
+        val relativePath: String,
+        val label: String,
+        val instanceId: String?
+    )
+
+    fun parseAssetEmbed(source: String): AssetEmbed? {
+        val match = embed.matchEntire(source) ?: return null
+        return AssetEmbed(
+            relativePath = match.groupValues[1],
+            label = match.groupValues[2],
+            instanceId = match.groupValues[3].ifBlank { null }
+        )
+    }
+
+    fun withInstanceId(source: String, instanceId: String): String? {
+        val parsed = parseAssetEmbed(source) ?: return null
+        if (extension(parsed.relativePath) != "pdf") return null
+        return buildString {
+            append("![[asset:")
+            append(parsed.relativePath)
+            append('|')
+            append(parsed.label)
+            append("|mote-id:")
+            append(instanceId)
+            append("]]" )
+        }
+    }
+
+    private fun embeddedBlock(
+        path: String,
+        label: String,
+        instanceId: String? = null
+    ): PreviewBlock = when (extension(path)) {
+        "pdf" -> PreviewBlock.Pdf(path, label, instanceId)
         in imageExtensions -> PreviewBlock.Image(path, label)
         else -> PreviewBlock.Attachment(path, label)
     }

@@ -36,6 +36,8 @@ import com.mlevngr.inknote.markdown.MarkdownEditing
 import com.mlevngr.inknote.markdown.MarkdownHistory
 import com.mlevngr.inknote.markdown.MarkdownHistoryKind
 import com.mlevngr.inknote.markdown.MarkdownHistoryState
+import com.mlevngr.inknote.markdown.MarkdownAssetParser
+import com.mlevngr.inknote.markdown.PdfPageNotes
 import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
@@ -44,6 +46,7 @@ import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.File
+import java.util.UUID
 
 class EditorActivity : AppCompatActivity() {
     private lateinit var library: NoteLibrary
@@ -127,6 +130,7 @@ class EditorActivity : AppCompatActivity() {
             onMultilineInput = ::replaceLineFromEditor,
             onMergeWithPrevious = ::mergeWithPrevious,
             onAssetActions = ::showAssetActions,
+            onAddPdfPageNote = ::addPdfPageNote,
             onPasteAt = ::showPasteAt,
             onPasteAtBoundary = ::showPasteAtBoundary,
             onAppendAtEnd = ::appendLineAtEnd,
@@ -560,6 +564,7 @@ class EditorActivity : AppCompatActivity() {
 
     private fun mergeWithPrevious(index: Int): Boolean {
         if (mode != EditorMode.Edit) return false
+        if (document.getOrNull(index - 1)?.let(PdfPageNotes::isMarker) == true) return false
         updateHistoryFocus(
             MarkdownEditResult(document[index], 0, 0)
         )
@@ -695,6 +700,28 @@ class EditorActivity : AppCompatActivity() {
         }
     }
 
+    private fun addPdfPageNote(lineIndex: Int, pageIndex: Int) {
+        if (lineIndex !in 0 until document.size) return
+        updateHistoryFocus()
+        val noteLine = runCatching {
+            document.insertPdfPageNote(lineIndex, pageIndex) { UUID.randomUUID().toString() }
+        }.getOrElse {
+            Toast.makeText(this, getString(R.string.add_pdf_page_note_failed), Toast.LENGTH_LONG)
+                .show()
+            return
+        }
+        mode = EditorMode.Edit
+        activeLine = noteLine
+        lastActiveLine = noteLine
+        recordHistory(MarkdownHistoryKind.Structural, noteLine, 0)
+        updateModeButton()
+        updateTitleInteraction()
+        updateMarkdownToolbar()
+        updateHistoryButtons()
+        refreshRows(requestFocus = true, cursorPosition = 0)
+        scheduleSave()
+    }
+
     private fun showAssetActions(lineIndex: Int, file: File, label: String) {
         val actions = arrayOf(
             getString(R.string.cut_inserted_file),
@@ -715,7 +742,14 @@ class EditorActivity : AppCompatActivity() {
 
     private fun stageAssetTransfer(lineIndex: Int, file: File, label: String, cut: Boolean) {
         if (lineIndex !in 0 until document.size) return
-        val source = document[lineIndex]
+        updateHistoryFocus()
+        val originalSource = document.assetBlockSource(lineIndex)
+        val source = if (cut) originalSource else {
+            val firstLine = originalSource.lineSequence().firstOrNull().orEmpty()
+            val instanceId = MarkdownAssetParser.parseAssetEmbed(firstLine)?.instanceId
+            if (instanceId == null) originalSource
+            else PdfPageNotes.rekey(originalSource, UUID.randomUUID().toString())
+        }
         val assetPath = runCatching {
             file.canonicalFile.relativeTo(workspace.root.canonicalFile).invariantSeparatorsPath
         }.getOrElse { file.name }
@@ -726,14 +760,8 @@ class EditorActivity : AppCompatActivity() {
             ClipData.newPlainText(label.ifBlank { file.name }, source)
         )
         if (cut) {
-            document.removeLine(lineIndex)
-            activeLine = activeLine?.let { active ->
-                when {
-                    active > lineIndex -> active - 1
-                    active == lineIndex -> lineIndex.coerceAtMost(document.size - 1)
-                    else -> active
-                }
-            }
+            val removedCount = document.removeAssetBlock(lineIndex)
+            activeLine = activeLineAfterRemoval(activeLine, lineIndex, removedCount)
             lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
             recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
             refreshRows()
@@ -769,7 +797,9 @@ class EditorActivity : AppCompatActivity() {
         val source = transfer?.source ?: clipboardText.orEmpty()
         if (source.isEmpty()) return
         if (transfer == null) {
-            val assetPath = ASSET_EMBED.matchEntire(source.trim())?.groupValues?.get(1)
+            val assetPath = source.lineSequence().firstOrNull()
+                ?.let(MarkdownAssetParser::parseAssetEmbed)
+                ?.relativePath
             if (assetPath != null && workspace.resolveAsset(assetPath) == null) {
                 Toast.makeText(this, R.string.asset_clipboard_unavailable, Toast.LENGTH_LONG).show()
                 return
@@ -847,14 +877,9 @@ class EditorActivity : AppCompatActivity() {
 
     private fun deleteAsset(lineIndex: Int, file: File) {
         if (lineIndex !in 0 until document.size) return
-        document.removeLine(lineIndex)
-        activeLine = activeLine?.let { active ->
-            when {
-                active > lineIndex -> active - 1
-                active == lineIndex -> lineIndex.coerceAtMost(document.size - 1)
-                else -> active
-            }
-        }
+        updateHistoryFocus()
+        val removedCount = document.removeAssetBlock(lineIndex)
+        activeLine = activeLineAfterRemoval(activeLine, lineIndex, removedCount)
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
         val remainingMarkdown = document.markdown()
@@ -876,6 +901,15 @@ class EditorActivity : AppCompatActivity() {
         refreshRows()
         scheduleSave()
     }
+
+    private fun activeLineAfterRemoval(active: Int?, start: Int, count: Int): Int? =
+        active?.let {
+            when {
+                it >= start + count -> it - count
+                it >= start -> start.coerceAtMost(document.size - 1)
+                else -> it
+            }
+        }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (mode == EditorMode.Edit && activeLine != null && event.isCtrlPressed) {
@@ -917,8 +951,6 @@ class EditorActivity : AppCompatActivity() {
         private const val SAVE_DELAY_MS = 350L
         private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"
-        private val ASSET_EMBED = Regex("""!\[\[asset:(assets/[^|\]]+)(?:\|[^\]]*)?]]""")
-
         fun intent(
             context: android.content.Context,
             folderLocation: FolderLocation,
