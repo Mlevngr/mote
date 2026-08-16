@@ -26,11 +26,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Test, lint and build APK
+      - name: Test, lint and build app plus plugin APKs
         run: ./gradlew testDebugUnitTest lintDebug assembleRelease
 
-      - name: Prepare release asset
-        run: cp app/build/outputs/apk/release/app-release.apk "Mote-${GITHUB_REF_NAME#v}.apk"
+      - name: Prepare release assets
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "Mote-${GITHUB_REF_NAME#v}.apk"
+          cp plugins/ai-organizer/build/outputs/apk/release/ai-organizer-release.apk "Mote-AI-Organizer-1.0.0.apk"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

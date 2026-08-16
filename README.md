@@ -4,7 +4,9 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（600% 高清画布缩放）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r7/Mote-0.8.0-r7.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（插件平台与主页侧边栏）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r8/Mote-0.8.0-r8.apk?download=1)**
+
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r8/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -65,7 +67,7 @@ Mote 有清晰的阅读、编辑两种模式：
 
 ## 主题与主页外观
 
-主页右上角的调色板按钮可以即时调整外观，设置会在下次启动时保留：
+主页左上角打开 Material 侧边栏；外观与布局、WebDAV、插件管理和回收站都集中在侧边栏，顶部只保留新建文件夹与新建笔记：
 
 - 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题。主题选择器使用每套主题自己的强调色名称和三色预览，不再显示成统一的灰色文字列表。各页面标题栏与正文使用完全相同的主题背景，不再额外增加灰色工具栏色块；Catppuccin 使用 Latte/Mocha 官方色阶，Tokyo Night 使用其官方昼夜前景、背景与蓝色强调色，Minimal 保持可定制主题的中性低干扰层级。
 - Samsung 风格默认将文件夹以双列卡片置于上方，笔记在下方保持易扫读的列表；也可切换为紧凑列表或双列缩略图网格。
@@ -105,7 +107,7 @@ Mote 使用非链接的本地嵌入指令：
 
 ## WebDAV 同步
 
-主页工具栏的云同步按钮打开独立设置页：
+主页侧边栏的“WebDAV 同步”打开独立设置页：
 
 - 可以同时填写内网地址（HTTP/HTTPS）和外网地址（必须 HTTPS），共用账号、密码与远端目录；每次同步先用 3 秒连接超时尝试内网，失败后自动切换外网，不读取 Wi‑Fi 名称、位置或网络环境权限。
 - 密码由 Android Keystore 的 AES-GCM 密钥加密后保存在本机；设置页禁止系统截图，日志不会记录密码或笔记正文。
@@ -116,6 +118,20 @@ Mote 使用非链接的本地嵌入指令：
 - 首次同步遇到同路径但内容不同的文件时，本机版本保留在原路径，远端版本保存为冲突副本。建议第一次启用前先确认两端笔记均已备份。
 
 当前版本提供手动同步，不会在后台定时联网；服务器证书使用 Android 系统信任链，不接受不受信任的自签名证书。
+
+## 可热插拔插件平台
+
+Mote 的插件是独立 APK，不会将任意 Android View、文件路径或编辑器对象注入主应用：
+
+- 安装插件 APK 后，Mote 通过带 API 版本的 Binder Service 自动发现；卸载或更新会即时刷新，不需要重启 Mote。
+- 没有安装插件时，编辑器插件入口隐藏，原有阅读、编辑、附件、PDF 和 WebDAV 链路不变。
+- 首次运行会显示插件声明的能力，如读取整篇笔记、修改文本、调整文档结构、网络访问或语音输入；权限可在侧边栏的“插件管理”中撤销。
+- 每个请求都有会话 ID、请求 ID 和文档版本指纹。笔记在插件运行期间被修改、请求取消、插件崩溃或被卸载时，旧结果会被丢弃。
+- 插件只能返回候选 Markdown；Mote 验证附件与 PDF 页间标记、显示修改预览，用户确认后才以一次可撤销的结构编辑应用。
+
+本 Release 同时提供独立的 **Mote AI Organizer** 示例插件。它支持 OpenAI Chat Completions 兼容接口，可分别配置内网和外网地址，并按顺序尝试；API Key 使用 Android Keystore 加密保存。提供“整理整篇笔记”、“生成摘要并整理”和“提取任务与行动项”，能生成多级标题、粗体、斜体、项目符号、编号和任务列表。插件未安装或未配置时，Mote 本体仍可完全离线使用。
+
+插件协议、Manifest 声明、线程模型和安全约束见 [`docs/plugin-api.md`](docs/plugin-api.md)。
 
 ## 当前 MVP
 
