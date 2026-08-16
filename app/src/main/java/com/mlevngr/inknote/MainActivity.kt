@@ -82,6 +82,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<AppCompatImageButton>(R.id.appearance).setOnClickListener {
             showAppearanceDialog()
         }
+        findViewById<AppCompatImageButton>(R.id.webdav_sync).setOnClickListener {
+            startActivity(Intent(this, WebDavSettingsActivity::class.java))
+        }
         findViewById<AppCompatImageButton>(R.id.create_folder).setOnClickListener {
             showCreateDialog(CreateType.Folder)
         }

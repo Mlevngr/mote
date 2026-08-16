@@ -122,4 +122,22 @@
     <string name="delete_permanently">永久删除</string>
     <string name="permanent_delete_confirmation">确定永久删除“%1$s”吗？此操作无法撤销。</string>
     <string name="permanently_deleted">已永久删除</string>
+    <string name="webdav_sync">WebDAV 同步</string>
+    <string name="webdav_endpoint_explanation">同步时优先连接内网地址；连接失败或超时后自动尝试外网地址。两个地址共用下面的账号、密码和远端目录，不需要位置或 Wi‑Fi 权限。</string>
+    <string name="webdav_internal_url">内网地址（HTTP 或 HTTPS，可选）</string>
+    <string name="webdav_external_url">外网地址（HTTPS，可选）</string>
+    <string name="webdav_remote_folder">远端目录</string>
+    <string name="webdav_username">用户名</string>
+    <string name="webdav_password">密码</string>
+    <string name="webdav_security_explanation">密码使用 Android Keystore 加密后保存在本机。外网地址必须使用 HTTPS；内网 HTTP 只适合可信局域网。</string>
+    <string name="webdav_save_and_test">保存并测试地址</string>
+    <string name="webdav_sync_now">立即同步</string>
+    <string name="webdav_testing">正在分别测试内网和外网地址…</string>
+    <string name="webdav_syncing">正在同步；将优先尝试内网地址…</string>
+    <string name="webdav_test_success">%1$s：%2$s</string>
+    <string name="webdav_test_failed">%1$s：%2$s</string>
+    <string name="webdav_sync_result">已通过%1$s完成同步\n上传 %2$d · 下载 %3$d · 本地删除 %4$d · 远端删除 %5$d · 冲突 %6$d</string>
+    <string name="webdav_internal">内网地址</string>
+    <string name="webdav_external">外网地址</string>
+    <string name="webdav_invalid_config">WebDAV 配置无效</string>
 </resources>

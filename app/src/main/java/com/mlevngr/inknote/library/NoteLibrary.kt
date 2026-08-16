@@ -12,6 +12,8 @@ class NoteLibrary internal constructor(private val root: File) {
         root.mkdirs()
     }
 
+    internal val storageRoot: File get() = root
+
     enum class EntryType { Folder, Note }
 
     data class FolderLocation(val names: List<String>) {

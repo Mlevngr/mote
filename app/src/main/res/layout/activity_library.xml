@@ -42,6 +42,16 @@
                 app:tint="?attr/inkNoteIconColor" />
 
             <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/webdav_sync"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/webdav_sync"
+                android:padding="12dp"
+                android:src="@drawable/ic_cloud_sync_24"
+                app:tint="?attr/inkNoteIconColor" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/create_folder"
                 android:layout_width="48dp"
                 android:layout_height="48dp"

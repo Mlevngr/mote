@@ -10,8 +10,8 @@ android {
         applicationId = "com.mlevngr.inknote"
         minSdk = 28
         targetSdk = 36
-        versionCode = 40
-        versionName = "0.7.12"
+        versionCode = 41
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -56,6 +56,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("com.google.android.material:material:1.14.0")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     val markwon = "4.6.2"
     implementation("io.noties.markwon:core:$markwon")
