@@ -10,8 +10,8 @@ android {
         applicationId = "com.mlevngr.inknote"
         minSdk = 28
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.7.8"
+        versionCode = 37
+        versionName = "0.7.9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
