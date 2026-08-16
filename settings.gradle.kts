@@ -18,3 +18,4 @@ rootProject.name = "InkNote"
 include(":app")
 include(":plugin-api")
 include(":plugins:ai-organizer")
+include(":plugins:local-organizer")

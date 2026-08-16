@@ -4,9 +4,11 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 45）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r14/Mote-0.8.0-r14.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（内部构建号 46）](https://github.com/Mlevngr/note/releases/download/v0.8.0-r15/Mote-0.8.0-r15.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r14/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/note/releases/download/v0.8.0-r15/Mote-AI-Organizer-1.0.0.apk?download=1)**
+
+**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/note/releases/download/v0.8.0-r15/Mote-Local-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/note/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -130,6 +132,8 @@ Mote 的插件是独立 APK，不会将任意 Android View、文件路径或编�
 - 插件只能返回候选 Markdown；Mote 验证附件与 PDF 页间标记、显示修改预览，用户确认后才以一次可撤销的结构编辑应用。
 
 本 Release 同时提供独立的 **Mote AI Organizer** 示例插件。它支持 OpenAI Chat Completions 兼容接口，可分别配置内网和外网地址，并按顺序尝试；API Key 使用 Android Keystore 加密保存。提供“整理整篇笔记”、“生成摘要并整理”和“提取任务与行动项”，能生成多级标题、粗体、斜体、项目符号、编号和任务列表。插件未安装或未配置时，Mote 本体仍可完全离线使用。
+
+不希望使用 AI 时，可以单独安装 **Mote 本地整理**。它不声明网络权限，以确定性规则在设备上规范标题、重点字段、项目符号、连续编号和任务项，也可生成去重的行动项清单。附件引用、PDF 页间标记和代码块会原样保留；结果同样必须经过 Mote 的修改预览后才能应用。
 
 插件协议、Manifest 声明、线程模型和安全约束见 [`docs/plugin-api.md`](docs/plugin-api.md)。
 

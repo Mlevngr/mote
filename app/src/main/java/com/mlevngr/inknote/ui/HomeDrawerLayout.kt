@@ -1,8 +1,11 @@
 package com.mlevngr.inknote.ui
 
 import android.content.Context
+import android.graphics.Rect
+import android.os.Build
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.View
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import kotlin.math.abs
@@ -13,16 +16,60 @@ class HomeDrawerLayout @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : DrawerLayout(context, attrs, defStyleAttr) {
+    private val density = resources.displayMetrics.density
     private val edgeSwipe = EdgeSwipeOpenDetector(
-        edgeWidthPx = 32f * resources.displayMetrics.density,
-        triggerDistancePx = 40f * resources.displayMetrics.density
+        edgeWidthPx = TOUCH_START_WIDTH_DP * density,
+        triggerDistancePx = TRIGGER_DISTANCE_DP * density
     )
+    private var drawerIsOpen = false
+
+    init {
+        addDrawerListener(object : SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: View) {
+                drawerIsOpen = true
+                updateGestureExclusion()
+            }
+
+            override fun onDrawerClosed(drawerView: View) {
+                drawerIsOpen = false
+                updateGestureExclusion()
+            }
+        })
+    }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (!isDrawerOpen(GravityCompat.START) && edgeSwipe.onTouch(event.actionMasked, event.x, event.y)) {
             openDrawer(GravityCompat.START)
         }
         return super.dispatchTouchEvent(event)
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        updateGestureExclusion()
+    }
+
+    private fun updateGestureExclusion() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        systemGestureExclusionRects = if (drawerIsOpen || width == 0 || height == 0) {
+            emptyList()
+        } else {
+            listOf(
+                Rect(
+                    0,
+                    0,
+                    (SYSTEM_EDGE_EXCLUSION_WIDTH_DP * density).toInt(),
+                    minOf(height, (SYSTEM_EDGE_EXCLUSION_HEIGHT_DP * density).toInt())
+                )
+            )
+        }
+    }
+
+    private companion object {
+        const val TOUCH_START_WIDTH_DP = 96f
+        const val TRIGGER_DISTANCE_DP = 32f
+        const val SYSTEM_EDGE_EXCLUSION_WIDTH_DP = 32f
+        const val SYSTEM_EDGE_EXCLUSION_HEIGHT_DP = 196f
     }
 }
 

@@ -8,17 +8,17 @@ import org.junit.Test
 
 class HomeNavigationTest {
     @Test fun leftEdgeHorizontalSwipeOpensDrawer() {
-        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 32f, triggerDistancePx = 40f)
+        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 96f, triggerDistancePx = 32f)
 
-        assertFalse(detector.onTouch(MotionEvent.ACTION_DOWN, 12f, 200f))
-        assertTrue(detector.onTouch(MotionEvent.ACTION_MOVE, 60f, 204f))
+        assertFalse(detector.onTouch(MotionEvent.ACTION_DOWN, 64f, 200f))
+        assertTrue(detector.onTouch(MotionEvent.ACTION_MOVE, 110f, 204f))
     }
 
     @Test fun movementOutsideEdgeOrMostlyVerticalDoesNotOpenDrawer() {
-        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 32f, triggerDistancePx = 40f)
+        val detector = EdgeSwipeOpenDetector(edgeWidthPx = 96f, triggerDistancePx = 32f)
 
-        detector.onTouch(MotionEvent.ACTION_DOWN, 50f, 100f)
-        assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 120f, 102f))
+        detector.onTouch(MotionEvent.ACTION_DOWN, 120f, 100f)
+        assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 190f, 102f))
         detector.onTouch(MotionEvent.ACTION_DOWN, 10f, 100f)
         assertFalse(detector.onTouch(MotionEvent.ACTION_MOVE, 55f, 180f))
     }
