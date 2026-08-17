@@ -10,8 +10,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.GestureDetector
 import android.view.Menu
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
@@ -180,11 +182,27 @@ class EditorActivity : AppCompatActivity() {
             onImeBack = ::handleBackNavigation
             setText(noteName)
             setSelection(text?.length ?: 0)
-            setOnLongClickListener {
-                if (mode == EditorMode.Read) {
-                    enterTitleEditMode()
-                    true
-                } else false
+            val titleView = this
+            val titleGestureDetector = GestureDetector(
+                this@EditorActivity,
+                object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onDown(event: MotionEvent): Boolean = true
+
+                    override fun onDoubleTap(event: MotionEvent): Boolean {
+                        enterTitleEditMode(titleView.getOffsetForPosition(event.x, event.y))
+                        return true
+                    }
+
+                    override fun onLongPress(event: MotionEvent) {
+                        enterTitleEditMode(titleView.getOffsetForPosition(event.x, event.y))
+                    }
+                }
+            )
+            setOnTouchListener { view, event ->
+                if (mode != EditorMode.Read) return@setOnTouchListener false
+                val handled = titleGestureDetector.onTouchEvent(event)
+                if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
+                handled
             }
             setOnFocusChangeListener { _, hasFocus ->
                 isCursorVisible = hasFocus && mode == EditorMode.Edit
@@ -502,7 +520,7 @@ class EditorActivity : AppCompatActivity() {
         refreshRows(requestFocus = true)
     }
 
-    private fun enterTitleEditMode() {
+    private fun enterTitleEditMode(cursorPosition: Int? = null) {
         mode = EditorMode.Edit
         activeLine = null
         history.breakGroup()
@@ -513,7 +531,8 @@ class EditorActivity : AppCompatActivity() {
         refreshRows()
         titleInput.post {
             titleInput.requestFocus()
-            titleInput.setSelection(titleInput.text?.length ?: 0)
+            val titleLength = titleInput.text?.length ?: 0
+            titleInput.setSelection((cursorPosition ?: titleLength).coerceIn(0, titleLength))
             getSystemService<InputMethodManager>()
                 ?.showSoftInput(titleInput, InputMethodManager.SHOW_IMPLICIT)
         }
