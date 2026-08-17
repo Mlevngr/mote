@@ -6,6 +6,10 @@
             android:icon="@drawable/ic_palette_24"
             android:title="@string/appearance" />
         <item
+            android:id="@+id/navigation_storage"
+            android:icon="@drawable/ic_folder_24"
+            android:title="@string/note_storage" />
+        <item
             android:id="@+id/navigation_webdav"
             android:icon="@drawable/ic_cloud_sync_24"
             android:title="@string/webdav_sync" />

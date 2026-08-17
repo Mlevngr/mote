@@ -55,6 +55,7 @@ import com.mlevngr.inknote.plugins.PluginApprovalStore
 import com.mlevngr.inknote.plugins.PluginDocumentGuard
 import com.mlevngr.inknote.plugins.PluginCapabilityLabels
 import com.mlevngr.inknote.plugins.PluginResultGate
+import com.mlevngr.inknote.storage.SharedStorageManager
 import com.mlevngr.mote.plugin.api.PluginAction
 import com.mlevngr.mote.plugin.api.PluginCapability
 import com.mlevngr.mote.plugin.api.PluginContract
@@ -1253,7 +1254,10 @@ class EditorActivity : AppCompatActivity() {
         if (!::document.isInitialized || !::workspace.isInitialized) return
         commitTitleRename()
         val markdown = document.markdown()
-        io.execute { synchronized(workspaceLock) { workspace.save(markdown) } }
+        io.execute {
+            synchronized(workspaceLock) { workspace.save(markdown) }
+            runCatching { SharedStorageManager(applicationContext).syncIfConfigured() }
+        }
     }
 
     override fun onDestroy() {

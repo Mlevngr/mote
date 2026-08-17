@@ -22,6 +22,23 @@ class WebDavSyncEngineTest {
         assertTrue(fixture.records().containsKey("Ideas.note/note.md"))
     }
 
+    @Test fun initialSharedFolderMigrationKeepsMarkdownAssetsAndFolderMetadataTogether() {
+        val fixture = fixture()
+        fixture.local("Work.folder/.mote-folder-color", "purple")
+        fixture.local("Work.folder/Plan.note/note.md", "![photo](assets/photo.jpg)")
+        fixture.local("Work.folder/Plan.note/assets/photo.jpg", "image bytes")
+
+        val report = fixture.sync()
+
+        assertEquals("purple", fixture.remote.text("Work.folder/.mote-folder-color"))
+        assertEquals(
+            "![photo](assets/photo.jpg)",
+            fixture.remote.text("Work.folder/Plan.note/note.md")
+        )
+        assertEquals("image bytes", fixture.remote.text("Work.folder/Plan.note/assets/photo.jpg"))
+        assertEquals(4, report.uploaded)
+    }
+
     @Test fun preservesEmptyFoldersWithAnInternalMarkerFile() {
         val fixture = fixture()
         File(fixture.root, "Empty.folder").mkdirs()

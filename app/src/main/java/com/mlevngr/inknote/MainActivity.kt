@@ -44,6 +44,7 @@ import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.FolderStripAdapter
 import com.mlevngr.inknote.ui.HomeDrawerLayout
 import com.mlevngr.inknote.ui.SystemBarInsets
+import com.mlevngr.inknote.storage.SharedStorageManager
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -53,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var folderAdapter: FolderStripAdapter
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
+    private lateinit var sharedStorage: SharedStorageManager
     private lateinit var libraryTitle: TextView
     private lateinit var drawer: HomeDrawerLayout
     private lateinit var navigationButton: AppCompatImageButton
@@ -63,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val refreshRevision = AtomicInteger()
+    private var lastSharedStorageError: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         appearance = AppearancePreferences(this)
@@ -76,6 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         library = NoteLibrary(this)
         trashPreferences = TrashPreferences(this)
+        sharedStorage = SharedStorageManager(this)
         currentFolder = runCatching {
             savedInstanceState
                 ?.getStringArrayList(STATE_FOLDER)
@@ -114,6 +118,8 @@ class MainActivity : AppCompatActivity() {
             .setNavigationItemSelectedListener { item ->
                 when (item.itemId) {
                     R.id.navigation_appearance -> showAppearanceDialog()
+                    R.id.navigation_storage ->
+                        startActivity(Intent(this, StorageSettingsActivity::class.java))
                     R.id.navigation_webdav ->
                         startActivity(Intent(this, WebDavSettingsActivity::class.java))
                     R.id.navigation_plugins ->
@@ -143,16 +149,24 @@ class MainActivity : AppCompatActivity() {
         })
         refresh()
         introduceNavigationDrawer()
+        introduceSharedStorage()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::adapter.isInitialized) refresh()
+        if (::adapter.isInitialized) synchronizeSharedStorage()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putStringArrayList(STATE_FOLDER, ArrayList(currentFolder.names))
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (::sharedStorage.isInitialized) {
+            io.execute { runCatching { sharedStorage.syncIfConfigured() } }
+        }
     }
 
     override fun onDestroy() {
@@ -187,6 +201,28 @@ class MainActivity : AppCompatActivity() {
                 else android.view.View.GONE
                 libraryTitle.text = currentFolder.title ?: getString(R.string.app_name)
                 updateNavigationState()
+            }
+        }
+    }
+
+    private fun synchronizeSharedStorage() {
+        io.execute {
+            val result = runCatching { sharedStorage.syncIfConfigured() }
+            main.post {
+                if (isFinishing || isDestroyed) return@post
+                result.fold(
+                    onSuccess = {
+                        lastSharedStorageError = null
+                        refresh()
+                    },
+                    onFailure = { error ->
+                        val message = error.message ?: getString(R.string.shared_storage_failed)
+                        if (message != lastSharedStorageError) {
+                            lastSharedStorageError = message
+                            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
             }
         }
     }
@@ -229,6 +265,24 @@ class MainActivity : AppCompatActivity() {
             drawer.openDrawer(GravityCompat.START)
             preferences.edit().putBoolean(DRAWER_INTRODUCTION_KEY, true).apply()
         }
+    }
+
+    private fun introduceSharedStorage() {
+        if (sharedStorage.treeUri != null) return
+        val preferences = getSharedPreferences(NAVIGATION_PREFERENCES, MODE_PRIVATE)
+        if (preferences.getBoolean(SHARED_STORAGE_INTRODUCTION_KEY, false)) return
+        preferences.edit().putBoolean(SHARED_STORAGE_INTRODUCTION_KEY, true).apply()
+        main.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.shared_storage_intro_title)
+                .setMessage(R.string.shared_storage_intro_message)
+                .setPositiveButton(R.string.shared_storage_choose) { _, _ ->
+                    startActivity(Intent(this, StorageSettingsActivity::class.java))
+                }
+                .setNegativeButton(R.string.later, null)
+                .show()
+        }, SHARED_STORAGE_PROMPT_DELAY_MS)
     }
 
     private fun showAppearanceDialog() {
@@ -746,5 +800,7 @@ class MainActivity : AppCompatActivity() {
         const val STATE_FOLDER = "current_folder"
         const val NAVIGATION_PREFERENCES = "navigation_ui"
         const val DRAWER_INTRODUCTION_KEY = "drawer_introduction_build_44"
+        const val SHARED_STORAGE_INTRODUCTION_KEY = "shared_storage_introduction_build_50"
+        const val SHARED_STORAGE_PROMPT_DELAY_MS = 700L
     }
 }

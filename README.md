@@ -4,11 +4,11 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 49）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r18/Mote-0.8.0-r18.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（内部构建号 50）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-0.8.0-r19.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r18/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
-**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r18/Mote-Local-Organizer-1.0.0.apk?download=1)**
+**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-Local-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/mote/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -150,13 +150,14 @@ Mote 的插件是独立 APK，不会将任意 Android View、文件路径或编�
 
 ## 本地数据结构
 
-笔记保存在 Android 应用私有目录：
-`/data/user/0/com.mlevngr.inknote/files/notes/`（部分工具显示为
-`/data/data/com.mlevngr.inknote/files/notes/`）。普通文件管理器无法直接访问该目录；配置
-WebDAV 后会将同一套目录结构同步到服务器。卸载应用会删除本机私有目录，因此卸载前应先完成同步。
+在主页侧栏打开“笔记存储”，可以通过 Android 系统文件夹选择器指定任意共享目录。
+Mote 会把现有笔记安全迁移到该目录，并在回到主页或离开编辑器时双向同步。其他支持系统
+文件选择器和 Markdown 的应用可以访问、编辑其中的 `note.md`、图片与 PDF；同时 Mote
+保留一份应用内工作缓存，以维持 PDF 渲染、缩略图和原子保存性能。卸载 Mote 不会删除
+已经同步到共享目录中的笔记。
 
 ```text
-files/notes/
+所选共享文件夹/
 ├── .trash/
 │   └── <回收站项目>/
 │       ├── metadata.properties

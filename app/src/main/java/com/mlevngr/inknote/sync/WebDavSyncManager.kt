@@ -2,11 +2,14 @@ package com.mlevngr.inknote.sync
 
 import android.content.Context
 import com.mlevngr.inknote.library.NoteLibrary
+import com.mlevngr.inknote.storage.SharedStorageManager
 import java.io.File
 
 class WebDavSyncManager(context: Context) {
-    private val root = NoteLibrary(context).storageRoot
-    private val state = WebDavSyncState(File(context.filesDir, "webdav-sync-state.properties"))
+    private val appContext = context.applicationContext
+    private val root = NoteLibrary(appContext).storageRoot
+    private val state = WebDavSyncState(File(appContext.filesDir, "webdav-sync-state.properties"))
+    private val sharedStorage = SharedStorageManager(appContext)
 
     fun testConnections(config: WebDavConfig): List<WebDavConnectionResult> {
         val validated = config.validated()
@@ -21,10 +24,13 @@ class WebDavSyncManager(context: Context) {
 
     fun sync(config: WebDavConfig): WebDavSyncReport {
         val validated = config.validated()
-        return WebDavEndpointFallback.run(validated.endpoints()) { endpoint ->
+        runCatching { sharedStorage.syncIfConfigured() }
+        val report = WebDavEndpointFallback.run(validated.endpoints()) { endpoint ->
                 val transport = WebDavTransport(validated, endpoint)
                 WebDavSyncEngine(root, state).sync(transport, validated.stateIdentity)
         }
+        runCatching { sharedStorage.syncIfConfigured() }
+        return report
     }
 
     companion object {
