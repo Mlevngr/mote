@@ -17,6 +17,9 @@
         android:theme="@style/Theme.InkNote"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".DataSafetyActivity"
+            android:exported="false" />
+        <activity
             android:name=".StorageSettingsActivity"
             android:exported="false" />
         <activity

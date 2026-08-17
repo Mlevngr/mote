@@ -32,6 +32,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.appearance.AppearancePreferences
+import com.mlevngr.inknote.backup.VaultBackupManager
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
@@ -1257,6 +1258,7 @@ class EditorActivity : AppCompatActivity() {
         io.execute {
             synchronized(workspaceLock) { workspace.save(markdown) }
             runCatching { SharedStorageManager(applicationContext).syncIfConfigured() }
+            runCatching { VaultBackupManager(applicationContext).runAutomaticBackupIfDue() }
         }
     }
 

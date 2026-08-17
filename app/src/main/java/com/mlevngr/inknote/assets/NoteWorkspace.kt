@@ -7,6 +7,8 @@ import android.provider.OpenableColumns
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.LegacyNoteBodyMigration
+import com.mlevngr.inknote.storage.AtomicFileWriter
+import com.mlevngr.inknote.storage.VaultOperationLock
 import java.io.File
 import java.util.UUID
 
@@ -16,38 +18,34 @@ class NoteWorkspace(context: Context, folderLocation: FolderLocation, private va
     private val markdownFile = File(root, "note.md")
     private val bodySeparationMarker = File(root, NoteLibrary.BODY_SEPARATION_MARKER)
 
-    fun load(defaultValue: String): String {
+    fun load(defaultValue: String): String = VaultOperationLock.withLock {
         if (!markdownFile.exists()) save(defaultValue)
         val markdown = markdownFile.readText()
-        if (bodySeparationMarker.exists()) return markdown
+        if (bodySeparationMarker.exists()) return@withLock markdown
 
         val separated = LegacyNoteBodyMigration.separateTitle(markdown, noteName)
         if (separated != markdown) save(separated)
-        bodySeparationMarker.writeText("")
-        return separated
+        AtomicFileWriter.writeText(bodySeparationMarker, "")
+        separated
     }
 
     fun save(markdown: String) {
-        val temporary = File(root, "note.md.tmp")
-        temporary.writeText(markdown)
-        if (!temporary.renameTo(markdownFile)) {
-            markdownFile.writeText(markdown)
-            temporary.delete()
-        }
+        AtomicFileWriter.writeText(markdownFile, markdown)
     }
 
     fun resolveAsset(relativePath: String): File? =
         AssetPathPolicy.resolve(root, relativePath)?.takeIf(File::isFile)
 
-    fun deleteAssetIfUnreferenced(file: File, remainingMarkdown: String): Boolean {
-        val canonicalFile = file.canonicalFile
-        val canonicalAssets = assets.canonicalFile
-        val assetPrefix = "${canonicalAssets.path}${File.separator}"
-        require(canonicalFile.path.startsWith(assetPrefix)) { "Asset is outside this note" }
-        val relativePath = canonicalFile.relativeTo(root.canonicalFile).invariantSeparatorsPath
-        if (relativePath in remainingMarkdown) return false
-        return !canonicalFile.exists() || canonicalFile.delete()
-    }
+    fun deleteAssetIfUnreferenced(file: File, remainingMarkdown: String): Boolean =
+        VaultOperationLock.withLock {
+            val canonicalFile = file.canonicalFile
+            val canonicalAssets = assets.canonicalFile
+            val assetPrefix = "${canonicalAssets.path}${File.separator}"
+            require(canonicalFile.path.startsWith(assetPrefix)) { "Asset is outside this note" }
+            val relativePath = canonicalFile.relativeTo(root.canonicalFile).invariantSeparatorsPath
+            if (relativePath in remainingMarkdown) return@withLock false
+            !canonicalFile.exists() || canonicalFile.delete()
+        }
 
     fun import(resolver: ContentResolver, uri: Uri): ImportedAsset {
         val displayName = queryDisplayName(resolver, uri) ?: "attachment"
@@ -66,12 +64,12 @@ class NoteWorkspace(context: Context, folderLocation: FolderLocation, private va
         val extension = extensionFor(mimeType, displayName, kind)
         val fileName = "${UUID.randomUUID()}.$extension"
         val destination = File(assets, fileName)
-        val temporary = File(assets, "$fileName.tmp")
-        resolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Cannot open selected file" }
-            temporary.outputStream().use { output -> input.copyTo(output) }
+        AtomicFileWriter.write(destination) { output ->
+            resolver.openInputStream(uri).use { input ->
+                requireNotNull(input) { "Cannot open selected file" }
+                input.copyTo(output)
+            }
         }
-        check(temporary.renameTo(destination)) { "Cannot store selected file" }
         return ImportedAsset(
             relativePath = "assets/$fileName",
             displayName = displayName,

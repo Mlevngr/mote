@@ -1,5 +1,6 @@
 package com.mlevngr.inknote.sync
 
+import com.mlevngr.inknote.storage.VaultOperationLock
 import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -13,7 +14,10 @@ class WebDavSyncEngine(
 ) {
     private val conflictNotes = mutableMapOf<String, File>()
 
-    fun sync(transport: WebDavRemote, identity: String): WebDavSyncReport {
+    fun sync(transport: WebDavRemote, identity: String): WebDavSyncReport =
+        VaultOperationLock.withLock { syncUnlocked(transport, identity) }
+
+    private fun syncUnlocked(transport: WebDavRemote, identity: String): WebDavSyncReport {
         root.mkdirs()
         conflictNotes.clear()
         ensureFolderMarkers()

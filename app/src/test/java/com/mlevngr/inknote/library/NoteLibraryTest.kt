@@ -1,6 +1,7 @@
 package com.mlevngr.inknote.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -41,6 +42,36 @@ class NoteLibraryTest {
         library.createNote(work, "Plan")
         assertEquals(listOf("Plan", "Plan (1)"), library.list(work).map { it.name })
         assertEquals(work, work.child("Child").parent())
+    }
+
+    @Test fun supportsSpecialUnicodeNamesAndNormalizesNewNamesToNfc() {
+        val (_, library) = library()
+        val names = listOf(
+            "中文 空格",
+            "emoji 📝",
+            "括号 () []",
+            "符号 # % &",
+            "多.点.名称"
+        )
+
+        val created = names.map { library.createNote(rootLocation, it).name }
+        val decomposed = library.createNote(rootLocation, "Cafe\u0301").name
+        val duplicate = library.createNote(rootLocation, "Café").name
+
+        assertEquals(names, created)
+        assertEquals("Café", decomposed)
+        assertEquals("Café (1)", duplicate)
+    }
+
+    @Test fun truncatesLongNamesWithoutSplittingEmojiOrExceedingSafeUtf8Length() {
+        val (_, library) = library()
+
+        val note = library.createNote(rootLocation, "📝".repeat(100))
+
+        assertTrue(note.name.toByteArray(Charsets.UTF_8).size <= 220)
+        assertFalse(Character.isHighSurrogate(note.name.last()))
+        assertEquals(55, note.name.codePointCount(0, note.name.length))
+        assertEquals(note.name, library.list(rootLocation).single().name)
     }
 
     @Test(expected = IllegalArgumentException::class)

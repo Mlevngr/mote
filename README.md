@@ -4,11 +4,11 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 50）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-0.8.0-r19.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（内部构建号 51）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-0.8.0-r20.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
-**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r19/Mote-Local-Organizer-1.0.0.apk?download=1)**
+**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-Local-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/mote/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -69,7 +69,7 @@ Mote 有清晰的阅读、编辑两种模式：
 
 ## 主题与主页外观
 
-主页左上角的三横线入口始终打开 Material 侧边栏，进入子文件夹后也不会被返回按钮替换；外观与布局、WebDAV、插件管理和回收站都集中在侧边栏：
+主页左上角的三横线入口始终打开 Material 侧边栏，进入子文件夹后也不会被返回按钮替换；外观与布局、共享存储、数据安全与备份、WebDAV、插件管理和回收站都集中在侧边栏：
 
 - 内置 Mote、Catppuccin、Tokyo Night 与 Obsidian Minimal 风格主题。主题选择器使用每套主题自己的强调色名称和三色预览，不再显示成统一的灰色文字列表。各页面标题栏与正文使用完全相同的主题背景，不再额外增加灰色工具栏色块；Catppuccin 使用 Latte/Mocha 官方色阶，Tokyo Night 使用其官方昼夜前景、背景与蓝色强调色，Minimal 保持可定制主题的中性低干扰层级。
 - Samsung 风格默认将文件夹以双列卡片置于上方，笔记在下方保持易扫读的列表；也可切换为紧凑列表或双列缩略图网格。
@@ -121,6 +121,21 @@ Mote 使用非链接的本地嵌入指令：
 
 当前版本提供手动同步，不会在后台定时联网；服务器证书使用 Android 系统信任链，不接受不受信任的自签名证书。
 
+## 数据安全、备份与恢复
+
+主页侧边栏的“数据安全与备份”提供独立于 WebDAV 的本地恢复链路：
+
+- 可通过 Android 系统文件夹选择器指定一个独立备份目录。首次选择立即创建完整备份；之后在离开主页或应用进入后台时检查时间，距离上次成功备份满 24 小时才创建下一份，不使用后台网络或常驻服务。
+- 自动备份是普通 `Mote-backup-日期_时间.zip`，包含原始 Markdown、图片、PDF、回收站和文件夹元数据；可脱离 Mote 直接解压读取。
+- 默认保留最近 14 份，成功创建新备份后自动清理更旧文件，也可以在设置页手动执行清理。
+- 写入外部目录时先使用 `.partial` 临时名称，完成后重新读取并核对 SHA-256，最后才重命名为正式 ZIP；中断或校验失败不会留下看似有效的正式备份。
+- “导出全部笔记”可将同一格式的完整 ZIP 保存到任意系统文件位置；导出完成后同样重新读取并校验。
+- “从 Mote ZIP 恢复”先在独立暂存目录中检查格式、条目数量、展开体积和路径穿越，再原子替换当前笔记库；无效或损坏归档不会修改已有笔记。
+- 自动备份目录必须独立于共享笔记目录，防止备份 ZIP 被再次同步并递归包含。
+- 正文与新附件使用 `写临时文件 → fsync → 原子替换`，进程在写入途中终止时不会先截断已有正文。
+
+备份检查失败不会阻塞启动或普通编辑；失败后不会更新“上次成功备份”时间，下次打开应用会再次尝试。
+
 ## 可热插拔插件平台
 
 Mote 的插件是独立 APK，不会将任意 Android View、文件路径或编辑器对象注入主应用：
@@ -145,7 +160,7 @@ Mote 的插件是独立 APK，不会将任意 Android View、文件路径或编�
 - 多笔记、嵌套文件夹与笔记选择界面
 - CommonMark、标题、强调、单行列表/引用、任务项和删除线渲染
 - 图片、PDF 与普通附件的统一导入
-- 文件复制到笔记私有目录，无存储权限；WebDAV 完全可选，未配置时保持离线
+- 文件复制到笔记自身的 `assets/`，可选共享目录、备份与 WebDAV 均通过系统授权且保持 local-first
 - 原子自动保存
 
 ## 本地数据结构

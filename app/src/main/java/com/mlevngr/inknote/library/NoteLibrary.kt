@@ -1,7 +1,10 @@
 package com.mlevngr.inknote.library
 
 import android.content.Context
+import com.mlevngr.inknote.storage.AtomicFileWriter
+import com.mlevngr.inknote.storage.VaultOperationLock
 import java.io.File
+import java.text.Normalizer
 import java.util.Properties
 import java.util.UUID
 
@@ -59,24 +62,31 @@ class NoteLibrary internal constructor(private val root: File) {
         .sortedWith(compareBy<Entry> { it.type != EntryType.Folder }
             .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
-    fun createFolder(location: FolderLocation, requestedName: String): Entry {
-        val parent = requireFolder(location)
-        val name = normalizedName(requestedName, stripMarkdownExtension = false)
-        val folder = uniqueTypedChild(parent, name, EntryType.Folder)
-        check(folder.mkdir()) { "无法创建文件夹" }
-        return folderEntry(folder)
-    }
+    fun createFolder(location: FolderLocation, requestedName: String): Entry =
+        VaultOperationLock.withLock {
+            val parent = requireFolder(location)
+            val name = normalizedName(requestedName, stripMarkdownExtension = false)
+            val folder = uniqueTypedChild(parent, name, EntryType.Folder)
+            check(folder.mkdir()) { "无法创建文件夹" }
+            folderEntry(folder)
+        }
 
-    fun createNote(location: FolderLocation, requestedName: String): Entry {
-        val parent = requireFolder(location)
-        val name = normalizedName(requestedName, stripMarkdownExtension = true)
-        val note = uniqueTypedChild(parent, name, EntryType.Note)
-        check(note.mkdir()) { "无法创建笔记" }
-        File(note, ASSETS_DIRECTORY).mkdirs()
-        File(note, NOTE_FILE).writeText("")
-        File(note, BODY_SEPARATION_MARKER).writeText("")
-        return noteEntry(note)
-    }
+    fun createNote(location: FolderLocation, requestedName: String): Entry =
+        VaultOperationLock.withLock {
+            val parent = requireFolder(location)
+            val name = normalizedName(requestedName, stripMarkdownExtension = true)
+            val note = uniqueTypedChild(parent, name, EntryType.Note)
+            check(note.mkdir()) { "无法创建笔记" }
+            runCatching {
+                check(File(note, ASSETS_DIRECTORY).mkdirs()) { "无法创建附件目录" }
+                AtomicFileWriter.writeText(File(note, NOTE_FILE), "")
+                AtomicFileWriter.writeText(File(note, BODY_SEPARATION_MARKER), "")
+                noteEntry(note)
+            }.getOrElse { error ->
+                note.deleteRecursively()
+                throw error
+            }
+        }
 
     fun listFolderLocations(): List<FolderLocation> = buildList {
         fun collect(parent: File, location: FolderLocation) {
@@ -96,27 +106,27 @@ class NoteLibrary internal constructor(private val root: File) {
         sourceLocation: FolderLocation,
         noteName: String,
         targetLocation: FolderLocation
-    ): Entry {
+    ): Entry = VaultOperationLock.withLock {
         val source = findChild(sourceLocation, noteName, EntryType.Note)
         val targetFolder = requireFolder(targetLocation)
-        if (sameFile(source.parentFile, targetFolder)) return noteEntry(source)
+        if (sameFile(source.parentFile, targetFolder)) return@withLock noteEntry(source)
         val destination = uniqueTypedChild(
             targetFolder,
             displayName(source, EntryType.Note),
             EntryType.Note
         )
         check(source.renameTo(destination)) { "无法移动笔记" }
-        return noteEntry(destination)
+        noteEntry(destination)
     }
 
     fun moveFolder(
         sourceLocation: FolderLocation,
         folderName: String,
         targetLocation: FolderLocation
-    ): Entry {
+    ): Entry = VaultOperationLock.withLock {
         val source = findChild(sourceLocation, folderName, EntryType.Folder)
         val targetFolder = requireFolder(targetLocation)
-        if (sameFile(source.parentFile, targetFolder)) return folderEntry(source)
+        if (sameFile(source.parentFile, targetFolder)) return@withLock folderEntry(source)
         require(!isSameOrDescendant(targetFolder, source)) { "不能把文件夹移动到自身或其子文件夹中" }
         val destination = uniqueTypedChild(
             targetFolder,
@@ -124,16 +134,18 @@ class NoteLibrary internal constructor(private val root: File) {
             EntryType.Folder
         )
         check(source.renameTo(destination)) { "无法移动文件夹" }
-        return folderEntry(destination)
+        folderEntry(destination)
     }
 
-    fun deleteNote(location: FolderLocation, noteName: String) {
+    fun deleteNote(location: FolderLocation, noteName: String) = VaultOperationLock.withLock {
         val note = findChild(location, noteName, EntryType.Note)
         check(note.deleteRecursively() && !note.exists()) { "无法删除笔记" }
     }
 
     fun renameNote(location: FolderLocation, noteName: String, requestedName: String): Entry =
-        noteEntry(renameChild(location, noteName, requestedName, EntryType.Note))
+        VaultOperationLock.withLock {
+            noteEntry(renameChild(location, noteName, requestedName, EntryType.Note))
+        }
 
     fun findFolder(location: FolderLocation, folderName: String): Entry =
         folderEntry(findChild(location, folderName, EntryType.Folder))
@@ -144,32 +156,38 @@ class NoteLibrary internal constructor(private val root: File) {
     internal fun findNoteDirectory(location: FolderLocation, noteName: String): File =
         findChild(location, noteName, EntryType.Note)
 
-    fun deleteFolder(location: FolderLocation, folderName: String) {
+    fun deleteFolder(location: FolderLocation, folderName: String) = VaultOperationLock.withLock {
         val folder = findChild(location, folderName, EntryType.Folder)
         check(folder.deleteRecursively() && !folder.exists()) { "无法删除文件夹" }
     }
 
     fun renameFolder(location: FolderLocation, folderName: String, requestedName: String): Entry =
-        folderEntry(renameChild(location, folderName, requestedName, EntryType.Folder))
+        VaultOperationLock.withLock {
+            folderEntry(renameChild(location, folderName, requestedName, EntryType.Folder))
+        }
 
     fun moveNoteToTrash(
         location: FolderLocation,
         noteName: String,
         deletedAt: Long = System.currentTimeMillis()
-    ): TrashEntry = moveToTrash(location, noteName, EntryType.Note, deletedAt)
+    ): TrashEntry = VaultOperationLock.withLock {
+        moveToTrash(location, noteName, EntryType.Note, deletedAt)
+    }
 
     fun moveFolderToTrash(
         location: FolderLocation,
         folderName: String,
         deletedAt: Long = System.currentTimeMillis()
-    ): TrashEntry = moveToTrash(location, folderName, EntryType.Folder, deletedAt)
+    ): TrashEntry = VaultOperationLock.withLock {
+        moveToTrash(location, folderName, EntryType.Folder, deletedAt)
+    }
 
     fun listTrash(): List<TrashEntry> = trashRoot().listFiles().orEmpty()
         .filter(File::isDirectory)
         .mapNotNull(::readTrashEntry)
         .sortedByDescending(TrashEntry::deletedAt)
 
-    fun restoreTrashEntry(id: String): Entry {
+    fun restoreTrashEntry(id: String): Entry = VaultOperationLock.withLock {
         val trash = findTrashContainer(id)
         val metadata = requireNotNull(readTrashEntry(trash)) { "回收站项目已损坏" }
         val payload = File(trash, TRASH_PAYLOAD)
@@ -177,10 +195,10 @@ class NoteLibrary internal constructor(private val root: File) {
         val destination = uniqueTypedChild(target, metadata.name, metadata.type)
         check(payload.renameTo(destination)) { "无法恢复项目" }
         trash.deleteRecursively()
-        return entry(destination, metadata.type)
+        entry(destination, metadata.type)
     }
 
-    fun permanentlyDeleteTrashEntry(id: String) {
+    fun permanentlyDeleteTrashEntry(id: String) = VaultOperationLock.withLock {
         val container = findTrashContainer(id)
         check(container.deleteRecursively() && !container.exists()) { "无法永久删除项目" }
     }
@@ -188,21 +206,22 @@ class NoteLibrary internal constructor(private val root: File) {
     fun cleanupExpiredTrash(
         retentionMillis: Long,
         now: Long = System.currentTimeMillis()
-    ): Int {
+    ): Int = VaultOperationLock.withLock {
         require(retentionMillis >= 0) { "保留时间无效" }
         var deleted = 0
         listTrash().filter { now - it.deletedAt >= retentionMillis }.forEach { entry ->
             runCatching { permanentlyDeleteTrashEntry(entry.id) }
                 .onSuccess { deleted++ }
         }
-        return deleted
+        deleted
     }
 
-    fun setFolderColor(location: FolderLocation, folderName: String, color: FolderColor): Entry {
-        val folder = findChild(location, folderName, EntryType.Folder)
-        File(folder, FOLDER_COLOR_FILE).writeText(color.id)
-        return folderEntry(folder)
-    }
+    fun setFolderColor(location: FolderLocation, folderName: String, color: FolderColor): Entry =
+        VaultOperationLock.withLock {
+            val folder = findChild(location, folderName, EntryType.Folder)
+            AtomicFileWriter.writeText(File(folder, FOLDER_COLOR_FILE), color.id)
+            folderEntry(folder)
+        }
 
     private fun moveToTrash(
         location: FolderLocation,
@@ -247,7 +266,8 @@ class NoteLibrary internal constructor(private val root: File) {
                 setProperty("path.$index", name)
             }
         }
-        File(container, TRASH_METADATA).outputStream().use { properties.store(it, null) }
+        val output = java.io.ByteArrayOutputStream().also { properties.store(it, null) }
+        AtomicFileWriter.writeBytes(File(container, TRASH_METADATA), output.toByteArray())
     }
 
     private fun readTrashEntry(container: File): TrashEntry? = runCatching {
@@ -352,14 +372,32 @@ class NoteLibrary internal constructor(private val root: File) {
     }
 
     private fun normalizedName(requestedName: String, stripMarkdownExtension: Boolean): String {
-        var name = requestedName.trim()
+        var name = Normalizer.normalize(requestedName.trim(), Normalizer.Form.NFC)
         if (stripMarkdownExtension && name.endsWith(".md", ignoreCase = true)) {
             name = name.dropLast(3).trimEnd()
         }
         require(name.isNotBlank()) { "名称不能为空" }
         require(name != "." && name != "..") { "名称无效" }
         require(name.none { it == '/' || it == '\u0000' }) { "名称不能包含 /" }
-        return name.take(MAX_NAME_LENGTH)
+        return truncateName(name)
+    }
+
+    private fun truncateName(name: String): String {
+        val result = StringBuilder()
+        var codePointCount = 0
+        var byteCount = 0
+        var index = 0
+        while (index < name.length && codePointCount < MAX_NAME_CODE_POINTS) {
+            val codePoint = name.codePointAt(index)
+            val value = String(Character.toChars(codePoint))
+            val bytes = value.toByteArray(Charsets.UTF_8).size
+            if (byteCount + bytes > MAX_NAME_UTF8_BYTES) break
+            result.append(value)
+            codePointCount++
+            byteCount += bytes
+            index += Character.charCount(codePoint)
+        }
+        return result.toString().trimEnd()
     }
 
     private fun entry(directory: File, type: EntryType): Entry {
@@ -423,7 +461,8 @@ class NoteLibrary internal constructor(private val root: File) {
         private const val TRASH_METADATA = "metadata.properties"
         private const val NOTE_DIRECTORY_SUFFIX = ".note"
         private const val FOLDER_DIRECTORY_SUFFIX = ".folder"
-        private const val MAX_NAME_LENGTH = 80
+        private const val MAX_NAME_CODE_POINTS = 80
+        private const val MAX_NAME_UTF8_BYTES = 220
         private const val MAX_PREVIEW_SOURCE_LENGTH = 32_768
     }
 }

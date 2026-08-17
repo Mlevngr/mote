@@ -10,6 +10,10 @@
             android:icon="@drawable/ic_folder_24"
             android:title="@string/note_storage" />
         <item
+            android:id="@+id/navigation_data_safety"
+            android:icon="@drawable/ic_timer_24"
+            android:title="@string/data_safety" />
+        <item
             android:id="@+id/navigation_webdav"
             android:icon="@drawable/ic_cloud_sync_24"
             android:title="@string/webdav_sync" />
