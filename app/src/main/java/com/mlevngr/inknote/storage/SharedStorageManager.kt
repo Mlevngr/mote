@@ -73,7 +73,7 @@ class SharedStorageManager(context: Context) {
                 DocumentsContract.getTreeDocumentId(candidate)
             )
         }.getOrDefault(false)
-        require(!containsBackups) { "共享笔记文件夹不能包含自动备份目录，请选择独立目录" }
+        require(!containsBackups) { "共享笔记文件夹不能包含备份目录，请选择独立目录" }
     }
 
     private companion object {

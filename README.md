@@ -4,11 +4,11 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 51）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-0.8.0-r20.apk?download=1)**
+**[直接下载 Mote 0.8.0 APK（内部构建号 52）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r21/Mote-0.8.0-r21.apk?download=1)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-AI-Organizer-1.0.0.apk?download=1)**
+**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r21/Mote-AI-Organizer-1.0.0.apk?download=1)**
 
-**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r20/Mote-Local-Organizer-1.0.0.apk?download=1)**
+**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r21/Mote-Local-Organizer-1.0.0.apk?download=1)**
 
 也可以进入 [GitHub Releases](https://github.com/Mlevngr/mote/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
 
@@ -125,16 +125,17 @@ Mote 使用非链接的本地嵌入指令：
 
 主页侧边栏的“数据安全与备份”提供独立于 WebDAV 的本地恢复链路：
 
-- 可通过 Android 系统文件夹选择器指定一个独立备份目录。首次选择立即创建完整备份；之后在离开主页或应用进入后台时检查时间，距离上次成功备份满 24 小时才创建下一份，不使用后台网络或常驻服务。
-- 自动备份是普通 `Mote-backup-日期_时间.zip`，包含原始 Markdown、图片、PDF、回收站和文件夹元数据；可脱离 Mote 直接解压读取。
-- 默认保留最近 14 份，成功创建新备份后自动清理更旧文件，也可以在设置页手动执行清理。
-- 写入外部目录时先使用 `.partial` 临时名称，完成后重新读取并核对 SHA-256，最后才重命名为正式 ZIP；中断或校验失败不会留下看似有效的正式备份。
+- 可通过 Android 系统文件夹选择器指定一个独立备份目录。Mote 仅在用户点击“立即创建完整备份”时备份，不在启动、退出或后台定时执行。
+- 手动备份是普通 `Mote-backup-日期_时间.zip`，包含原始 Markdown、图片、PDF、回收站和文件夹元数据；可脱离 Mote 直接解压读取。
+- 默认保留最近 14 份，成功创建新的手动备份后清理更旧文件，也可以在设置页单独执行清理。页面会保留最近一次手动备份的成功、失败或中断状态。
+- ZIP 内包含逐文件大小和 SHA-256 清单；恢复前会验证全部文件，同时兼容尚未包含清单的旧版 Mote ZIP。
+- 写入外部目录时先使用 `.partial` 临时名称，完成后重新读取并核对整个 ZIP 的 SHA-256，最后才重命名为正式文件；中断或校验失败不会留下看似有效的正式备份。
 - “导出全部笔记”可将同一格式的完整 ZIP 保存到任意系统文件位置；导出完成后同样重新读取并校验。
-- “从 Mote ZIP 恢复”先在独立暂存目录中检查格式、条目数量、展开体积和路径穿越，再原子替换当前笔记库；无效或损坏归档不会修改已有笔记。
-- 自动备份目录必须独立于共享笔记目录，防止备份 ZIP 被再次同步并递归包含。
+- “从 Mote ZIP 恢复”先在独立暂存目录中检查格式、条目数量、展开体积、路径穿越和文件哈希，再通过持久化事务日志替换当前笔记库；即使进程在目录切换中被终止，下次启动也会完成安装或恢复原笔记库。
+- 备份目录必须独立于共享笔记目录，防止备份 ZIP 被再次同步并递归包含。
 - 正文与新附件使用 `写临时文件 → fsync → 原子替换`，进程在写入途中终止时不会先截断已有正文。
 
-备份检查失败不会阻塞启动或普通编辑；失败后不会更新“上次成功备份”时间，下次打开应用会再次尝试。
+备份失败不会影响普通编辑，也不会自动重试；错误会保留在数据安全页面，下一次备份仍由用户手动启动。
 
 ## 可热插拔插件平台
 

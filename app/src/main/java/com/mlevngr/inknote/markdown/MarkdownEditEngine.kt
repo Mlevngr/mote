@@ -21,7 +21,8 @@ enum class MarkdownBlockStyle(val prefix: String) {
     Quote("> ")
 }
 
-object MarkdownEditing {
+/** Pure Markdown transformations: source and selection in, updated source and selection out. */
+object MarkdownEditEngine {
     private val headingPrefix = Regex("^#{1,6}\\s+")
     private val taskPrefix = Regex("^[-+*]\\s+\\[[ xX]]\\s+")
     private val bulletPrefix = Regex("^[-+*]\\s+")

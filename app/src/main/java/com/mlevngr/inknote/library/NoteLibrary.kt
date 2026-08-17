@@ -3,6 +3,7 @@ package com.mlevngr.inknote.library
 import android.content.Context
 import com.mlevngr.inknote.storage.AtomicFileWriter
 import com.mlevngr.inknote.storage.VaultOperationLock
+import com.mlevngr.inknote.storage.VaultRestoreTransaction
 import java.io.File
 import java.text.Normalizer
 import java.util.Properties
@@ -12,6 +13,7 @@ class NoteLibrary internal constructor(private val root: File) {
     constructor(context: Context) : this(File(context.filesDir, "notes"))
 
     init {
+        VaultOperationLock.withLock { VaultRestoreTransaction.recover(root) }
         root.mkdirs()
     }
 

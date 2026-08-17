@@ -32,13 +32,12 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mlevngr.inknote.assets.NoteWorkspace
 import com.mlevngr.inknote.appearance.AppearancePreferences
-import com.mlevngr.inknote.backup.VaultBackupManager
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.markdown.MarkdownDocument
 import com.mlevngr.inknote.markdown.MarkdownBlockStyle
 import com.mlevngr.inknote.markdown.MarkdownEditResult
-import com.mlevngr.inknote.markdown.MarkdownEditing
+import com.mlevngr.inknote.markdown.MarkdownEditEngine
 import com.mlevngr.inknote.markdown.MarkdownHistory
 import com.mlevngr.inknote.markdown.MarkdownHistoryKind
 import com.mlevngr.inknote.markdown.MarkdownHistoryState
@@ -577,13 +576,13 @@ class EditorActivity : AppCompatActivity() {
             button.setOnClickListener { showHeadingMenu() }
         }
         findViewById<View>(R.id.markdown_bold).setOnClickListener {
-            applyMarkdownEdit(MarkdownEditing::bold)
+            applyMarkdownEdit(MarkdownEditEngine::bold)
         }
         findViewById<View>(R.id.markdown_italic).setOnClickListener {
-            applyMarkdownEdit(MarkdownEditing::italic)
+            applyMarkdownEdit(MarkdownEditEngine::italic)
         }
         findViewById<View>(R.id.markdown_strikethrough).setOnClickListener {
-            applyMarkdownEdit(MarkdownEditing::strikethrough)
+            applyMarkdownEdit(MarkdownEditEngine::strikethrough)
         }
         findViewById<View>(R.id.markdown_task).setOnClickListener {
             applyBlockStyle(MarkdownBlockStyle.Task)
@@ -598,18 +597,18 @@ class EditorActivity : AppCompatActivity() {
             applyBlockStyle(MarkdownBlockStyle.Quote)
         }
         findViewById<View>(R.id.markdown_inline_code).setOnClickListener {
-            applyMarkdownEdit(MarkdownEditing::inlineCode)
+            applyMarkdownEdit(MarkdownEditEngine::inlineCode)
         }
         findViewById<View>(R.id.markdown_link).setOnClickListener {
             val placeholder = getString(R.string.markdown_link_placeholder)
             applyMarkdownEdit { source, start, end ->
-                MarkdownEditing.link(source, start, end, placeholder)
+                MarkdownEditEngine.link(source, start, end, placeholder)
             }
         }
     }
 
     private fun showHeadingMenu() {
-        val current = activeLine?.let { MarkdownEditing.headingLevel(document[it]) } ?: 0
+        val current = activeLine?.let { MarkdownEditEngine.headingLevel(document[it]) } ?: 0
         PopupMenu(this, headingButton).apply {
             menu.add(Menu.NONE, 0, 0, getString(R.string.markdown_body))
             val labels = intArrayOf(
@@ -628,7 +627,7 @@ class EditorActivity : AppCompatActivity() {
             menu.findItem(current)?.isChecked = true
             setOnMenuItemClickListener { item ->
                 applyMarkdownEdit { source, start, end ->
-                    MarkdownEditing.setHeading(source, start, end, item.itemId)
+                    MarkdownEditEngine.setHeading(source, start, end, item.itemId)
                 }
                 true
             }
@@ -638,7 +637,7 @@ class EditorActivity : AppCompatActivity() {
 
     private fun applyBlockStyle(style: MarkdownBlockStyle) {
         applyMarkdownEdit { source, start, end ->
-            MarkdownEditing.toggleBlock(source, start, end, style)
+            MarkdownEditEngine.toggleBlock(source, start, end, style)
         }
     }
 
@@ -650,7 +649,7 @@ class EditorActivity : AppCompatActivity() {
             selectionEnd = document[line].length
         )
         updateHistoryFocus(current)
-        val toggled = MarkdownEditing.toggleBlock(
+        val toggled = MarkdownEditEngine.toggleBlock(
             current.source,
             current.selectionStart,
             current.selectionEnd,
@@ -658,19 +657,19 @@ class EditorActivity : AppCompatActivity() {
         )
         document.update(line, toggled.source)
 
-        val selection = if (MarkdownEditing.isOrderedLine(toggled.source)) {
+        val selection = if (MarkdownEditEngine.isOrderedLine(toggled.source)) {
             document.renumberOrderedListAt(line)
-            MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+            MarkdownEditEngine.adjustSelectionAfterOrderedRenumber(
                 toggled.source,
                 document[line],
                 toggled.selectionStart,
                 toggled.selectionEnd
             )
         } else {
-            val removedNumber = MarkdownEditing.orderedNumber(current.source)
-            val removedIndent = MarkdownEditing.orderedIndent(current.source)
+            val removedNumber = MarkdownEditEngine.orderedNumber(current.source)
+            val removedIndent = MarkdownEditEngine.orderedIndent(current.source)
             document.renumberOrderedListAt(line - 1)
-            val nextIndent = document.getOrNull(line + 1)?.let(MarkdownEditing::orderedIndent)
+            val nextIndent = document.getOrNull(line + 1)?.let(MarkdownEditEngine::orderedIndent)
             if (nextIndent == removedIndent) {
                 document.renumberOrderedListAt(line + 1, startingNumber = removedNumber)
             }
@@ -703,7 +702,7 @@ class EditorActivity : AppCompatActivity() {
         val visible = mode == EditorMode.Edit && line != null
         markdownToolbar.visibility = if (visible) View.VISIBLE else View.GONE
         if (visible) {
-            val level = MarkdownEditing.headingLevel(document[line])
+            val level = MarkdownEditEngine.headingLevel(document[line])
             headingButton.text = if (level == 0) getString(R.string.markdown_body) else "H$level"
         }
     }
@@ -850,7 +849,7 @@ class EditorActivity : AppCompatActivity() {
         updateHistoryFocus(
             MarkdownEditResult(document[index], cursor, cursor)
         )
-        val orderedSplit = MarkdownEditing.splitOrderedLine(document[index], cursor)
+        val orderedSplit = MarkdownEditEngine.splitOrderedLine(document[index], cursor)
         val cursorPosition = if (orderedSplit == null) {
             activeLine = document.splitLine(index, cursor)
             0
@@ -858,7 +857,7 @@ class EditorActivity : AppCompatActivity() {
             document.replaceLine(index, listOf(orderedSplit.currentLine, orderedSplit.nextLine))
             activeLine = index + 1
             document.renumberOrderedListAt(index + 1)
-            MarkdownEditing.orderedPrefixLength(document[index + 1]) ?: 0
+            MarkdownEditEngine.orderedPrefixLength(document[index + 1]) ?: 0
         }
         lastActiveLine = activeLine ?: index
         recordHistory(MarkdownHistoryKind.Structural, activeLine, cursorPosition)
@@ -895,11 +894,11 @@ class EditorActivity : AppCompatActivity() {
         }
         if (document.getOrNull(index - 1)?.let(PdfPageNotes::isMarker) == true) return false
         val deletedLine = document.getOrNull(index)
-        val deletedNumber = deletedLine?.let(MarkdownEditing::orderedNumber)
-        val deletedIndent = deletedLine?.let(MarkdownEditing::orderedIndent)
+        val deletedNumber = deletedLine?.let(MarkdownEditEngine::orderedNumber)
+        val deletedIndent = deletedLine?.let(MarkdownEditEngine::orderedIndent)
         val cursor = document.mergeWithPrevious(index) ?: return false
         if (deletedNumber != null &&
-            document.getOrNull(index)?.let(MarkdownEditing::orderedIndent) == deletedIndent
+            document.getOrNull(index)?.let(MarkdownEditEngine::orderedIndent) == deletedIndent
         ) {
             document.renumberOrderedListAt(index, startingNumber = deletedNumber)
         }
@@ -1258,7 +1257,6 @@ class EditorActivity : AppCompatActivity() {
         io.execute {
             synchronized(workspaceLock) { workspace.save(markdown) }
             runCatching { SharedStorageManager(applicationContext).syncIfConfigured() }
-            runCatching { VaultBackupManager(applicationContext).runAutomaticBackupIfDue() }
         }
     }
 

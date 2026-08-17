@@ -17,7 +17,7 @@ class VaultBackupManager(context: Context) {
     private val vaultRoot = NoteLibrary(appContext).storageRoot
 
     val backupTreeUri: Uri? get() = preferences.treeUri
-    val lastSuccessfulBackupAt: Long get() = preferences.lastSuccessfulBackupAt
+    val lastBackupAttempt: BackupAttempt? get() = preferences.lastAttempt
 
     fun configureBackupFolder(treeUri: Uri) = synchronized(BACKUP_LOCK) {
         requireSafeBackupTree(treeUri)
@@ -43,31 +43,27 @@ class VaultBackupManager(context: Context) {
     }
 
     fun createBackup(now: Long = System.currentTimeMillis()): BackupResult = synchronized(BACKUP_LOCK) {
-        val treeUri = preferences.treeUri ?: error("请先选择自动备份文件夹")
-        requireSafeBackupTree(treeUri)
-        val temporary = createArchiveFile(now)
+        preferences.recordBackupStarted(now)
         try {
+            val treeUri = preferences.treeUri ?: error("请先选择备份文件夹")
+            requireSafeBackupTree(treeUri)
+            val temporary = createArchiveFile(now)
             val store = BackupDocumentStore(resolver, treeUri)
-            val backup = store.store(temporary, now)
-            preferences.recordSuccessfulBackup(now)
-            BackupResult(backup.name, runCatching { store.backupCount() }.getOrDefault(1))
-        } finally {
-            temporary.delete()
+            try {
+                val backup = store.store(temporary, now)
+                preferences.recordSuccessfulBackup(now, backup.name)
+                BackupResult(backup.name, runCatching { store.backupCount() }.getOrDefault(1))
+            } finally {
+                temporary.delete()
+            }
+        } catch (error: Exception) {
+            preferences.recordFailedBackup(now, error.message)
+            throw error
         }
     }
 
-    fun runAutomaticBackupIfDue(now: Long = System.currentTimeMillis()): BackupResult? {
-        if (preferences.treeUri == null) return null
-        if (!BackupSchedule.isDue(
-                preferences.lastSuccessfulBackupAt,
-                now,
-                AUTOMATIC_INTERVAL_MILLIS
-            )) return null
-        return createBackup(now)
-    }
-
     fun cleanupOldBackups(): Int = synchronized(BACKUP_LOCK) {
-        val treeUri = preferences.treeUri ?: error("请先选择自动备份文件夹")
+        val treeUri = preferences.treeUri ?: error("请先选择备份文件夹")
         BackupDocumentStore(resolver, treeUri).cleanupExpired()
     }
 
@@ -136,7 +132,6 @@ class VaultBackupManager(context: Context) {
     data class BackupResult(val fileName: String, val retainedCount: Int)
 
     companion object {
-        const val AUTOMATIC_INTERVAL_MILLIS = 24L * 60L * 60L * 1000L
         private val BACKUP_LOCK = Any()
     }
 }

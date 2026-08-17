@@ -73,6 +73,44 @@ class VaultArchiveTest {
 
         assertTrue("Safe.note/note.md" in paths)
         assertFalse(paths.any { ".tmp-" in it })
+        assertTrue(VaultArchive.HASH_MANIFEST_PATH in paths)
+    }
+
+    @Test fun rejectsFileWhoseContentDoesNotMatchArchiveHashManifest() {
+        val source = temporaryFolder.newFolder("hash-source")
+        File(source, "Safe.note").mkdirs()
+        File(source, "Safe.note/note.md").writeText("trusted")
+        val archive = ByteArrayOutputStream().also { VaultArchive.create(source, it) }.toByteArray()
+        val tampered = rewriteEntry(archive, "Safe.note/note.md", "tampered".toByteArray())
+        val existing = temporaryFolder.newFolder("hash-target")
+        File(existing, "Existing.note").mkdirs()
+        File(existing, "Existing.note/note.md").writeText("keep")
+
+        val failure = runCatching {
+            VaultArchive.restore(ByteArrayInputStream(tampered), existing)
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals("keep", File(existing, "Existing.note/note.md").readText())
+        assertFalse(File(existing, "Safe.note").exists())
+    }
+
+    @Test fun restoresLegacyArchiveWithoutFileHashManifest() {
+        val vault = File(temporaryFolder.root, "legacy-target")
+        val archive = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry(VaultArchive.MANIFEST_PATH))
+                zip.write("formatVersion=1\n".toByteArray())
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry("Legacy.note/note.md"))
+                zip.write("legacy".toByteArray())
+                zip.closeEntry()
+            }
+        }
+
+        VaultArchive.restore(ByteArrayInputStream(archive.toByteArray()), vault)
+
+        assertEquals("legacy", File(vault, "Legacy.note/note.md").readText())
     }
 
     @Test fun rejectsArchivePathTraversalWithoutWritingOutsideVault() {
@@ -104,4 +142,23 @@ class VaultArchiveTest {
                 MessageDigest.getInstance("SHA-256").digest(file.readBytes())
                     .joinToString("") { "%02x".format(it) }
         }
+
+    private fun rewriteEntry(archive: ByteArray, target: String, replacement: ByteArray): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipInputStream(ByteArrayInputStream(archive)).use { input ->
+            ZipOutputStream(output).use { zip ->
+                while (true) {
+                    val entry = input.nextEntry ?: break
+                    val copy = ZipEntry(entry.name).apply { time = entry.time }
+                    zip.putNextEntry(copy)
+                    if (!entry.isDirectory) {
+                        if (entry.name == target) zip.write(replacement) else input.copyTo(zip)
+                    }
+                    zip.closeEntry()
+                    input.closeEntry()
+                }
+            }
+        }
+        return output.toByteArray()
+    }
 }

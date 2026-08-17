@@ -40,7 +40,6 @@ import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.library.TrashPreferences
 import com.mlevngr.inknote.appearance.ThemeColors
-import com.mlevngr.inknote.backup.VaultBackupManager
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.FolderStripAdapter
 import com.mlevngr.inknote.ui.HomeDrawerLayout
@@ -56,7 +55,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appearance: AppearancePreferences
     private lateinit var trashPreferences: TrashPreferences
     private lateinit var sharedStorage: SharedStorageManager
-    private lateinit var backupManager: VaultBackupManager
     private lateinit var libraryTitle: TextView
     private lateinit var drawer: HomeDrawerLayout
     private lateinit var navigationButton: AppCompatImageButton
@@ -82,7 +80,6 @@ class MainActivity : AppCompatActivity() {
         library = NoteLibrary(this)
         trashPreferences = TrashPreferences(this)
         sharedStorage = SharedStorageManager(this)
-        backupManager = VaultBackupManager(this)
         currentFolder = runCatching {
             savedInstanceState
                 ?.getStringArrayList(STATE_FOLDER)
@@ -172,7 +169,6 @@ class MainActivity : AppCompatActivity() {
         if (::sharedStorage.isInitialized) {
             io.execute {
                 runCatching { sharedStorage.syncIfConfigured() }
-                runCatching { backupManager.runAutomaticBackupIfDue() }
             }
         }
     }

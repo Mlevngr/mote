@@ -43,7 +43,7 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
     }
 
     fun renumberOrderedListAt(index: Int, startingNumber: Int? = null): Boolean {
-        val updated = MarkdownEditing.renumberOrderedList(lines, index, startingNumber)
+        val updated = MarkdownEditEngine.renumberOrderedList(lines, index, startingNumber)
         if (updated === lines || updated == lines) return false
         lines.clear()
         lines.addAll(updated)
@@ -61,18 +61,18 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         selectionEnd: Int
     ): MarkdownLineUpdateResult {
         val previous = lines[index]
-        val previousNumber = MarkdownEditing.orderedNumber(previous)
-        val previousIndent = MarkdownEditing.orderedIndent(previous)
-        val previousPrefix = MarkdownEditing.orderedPrefix(previous)
+        val previousNumber = MarkdownEditEngine.orderedNumber(previous)
+        val previousIndent = MarkdownEditEngine.orderedIndent(previous)
+        val previousPrefix = MarkdownEditEngine.orderedPrefix(previous)
         update(index, source)
 
-        val currentIndent = MarkdownEditing.orderedIndent(source)
-        val currentPrefix = MarkdownEditing.orderedPrefix(source)
+        val currentIndent = MarkdownEditEngine.orderedIndent(source)
+        val currentPrefix = MarkdownEditEngine.orderedPrefix(source)
         var renumbered = false
 
         // Moving out of an existing list run closes the gap left in that run.
         if (previousNumber != null && previousIndent != currentIndent) {
-            val nextIndent = getOrNull(index + 1)?.let(MarkdownEditing::orderedIndent)
+            val nextIndent = getOrNull(index + 1)?.let(MarkdownEditEngine::orderedIndent)
             if (nextIndent == previousIndent) {
                 renumbered = renumberOrderedListAt(index + 1, startingNumber = previousNumber)
             }
@@ -87,7 +87,7 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         val edit = if (finalSource == source) {
             MarkdownEditResult(source, selectionStart, selectionEnd)
         } else {
-            MarkdownEditing.adjustSelectionAfterOrderedRenumber(
+            MarkdownEditEngine.adjustSelectionAfterOrderedRenumber(
                 source,
                 finalSource,
                 selectionStart,

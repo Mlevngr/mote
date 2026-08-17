@@ -12,6 +12,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mlevngr.inknote.appearance.AppearancePreferences
 import com.mlevngr.inknote.backup.VaultBackupManager
+import com.mlevngr.inknote.backup.BackupAttempt
 import com.mlevngr.inknote.storage.SharedStorageManager
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.text.DateFormat
@@ -109,8 +110,7 @@ class DataSafetyActivity : AppCompatActivity() {
     private fun configureBackupFolder(uri: Uri) {
         runOperation(R.string.configuring_backup_folder) {
             manager.configureBackupFolder(uri)
-            val result = manager.createBackup()
-            getString(R.string.backup_created, result.fileName, result.retainedCount)
+            getString(R.string.backup_folder_configured)
         }
     }
 
@@ -121,7 +121,6 @@ class DataSafetyActivity : AppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.restore_now) { _, _ ->
                 runOperation(R.string.restoring_vault, finishOnSuccess = true) {
-                    if (manager.backupTreeUri != null) manager.createBackup()
                     manager.restoreVault(uri)
                     runCatching { SharedStorageManager(applicationContext).syncIfConfigured() }
                     getString(R.string.restore_completed)
@@ -166,13 +165,27 @@ class DataSafetyActivity : AppCompatActivity() {
         } else {
             getString(R.string.backup_folder_selected, name ?: manager.backupTreeUri.toString())
         }
-        lastBackup.text = if (manager.lastSuccessfulBackupAt <= 0L) {
-            getString(R.string.no_backup_yet)
-        } else {
-            getString(
-                R.string.last_backup_at,
-                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                    .format(Date(manager.lastSuccessfulBackupAt))
+        lastBackup.text = backupAttemptSummary(manager.lastBackupAttempt)
+    }
+
+    private fun backupAttemptSummary(attempt: BackupAttempt?): String {
+        if (attempt == null) return getString(R.string.no_backup_yet)
+        val time = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+            .format(Date(attempt.attemptedAt))
+        return when (attempt.status) {
+            BackupAttempt.Status.SUCCESS -> getString(
+                R.string.last_manual_backup_succeeded,
+                time,
+                attempt.fileName.orEmpty()
+            )
+            BackupAttempt.Status.FAILED -> getString(
+                R.string.last_manual_backup_failed,
+                time,
+                attempt.errorMessage ?: getString(R.string.data_operation_failed)
+            )
+            BackupAttempt.Status.IN_PROGRESS -> getString(
+                R.string.last_manual_backup_interrupted,
+                time
             )
         }
     }
