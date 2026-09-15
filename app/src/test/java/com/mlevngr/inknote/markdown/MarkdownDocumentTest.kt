@@ -24,6 +24,31 @@ class MarkdownDocumentTest {
         assertEquals("Changed\nSecond\nThird", document.markdown())
     }
 
+    @Test fun togglesTaskCompletionInBothDirections() {
+        val document = MarkdownDocument.parse("- [ ] Buy milk")
+
+        assertEquals(true, document.toggleTask(0))
+        assertEquals("- [x] Buy milk", document.markdown())
+
+        assertEquals(true, document.toggleTask(0))
+        assertEquals("- [ ] Buy milk", document.markdown())
+    }
+
+    @Test fun togglingTaskPreservesMarkerIndentationAndContent() {
+        val document = MarkdownDocument.parse("  + [X] **Nested task**")
+
+        assertEquals(true, document.toggleTask(0))
+
+        assertEquals("  + [ ] **Nested task**", document.markdown())
+    }
+
+    @Test fun refusesToToggleANonTaskLine() {
+        val document = MarkdownDocument.parse("- ordinary list item")
+
+        assertEquals(false, document.toggleTask(0))
+        assertEquals("- ordinary list item", document.markdown())
+    }
+
     @Test fun splitsAtCursorAndReturnsNewActiveLine() {
         val document = MarkdownDocument.parse("Hello world")
         assertEquals(1, document.splitLine(0, 5))

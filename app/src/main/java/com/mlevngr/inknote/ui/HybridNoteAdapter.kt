@@ -25,6 +25,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatCheckBox
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.getSystemService
 import androidx.core.view.setPadding
@@ -34,6 +35,7 @@ import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.markdown.MarkdownAutoPairing
 import com.mlevngr.inknote.markdown.MarkdownEditResult
 import com.mlevngr.inknote.markdown.MarkdownHistoryKind
+import com.mlevngr.inknote.markdown.MarkdownTaskLine
 import com.mlevngr.inknote.pdf.PdfDocumentSource
 import com.mlevngr.inknote.ui.AssetPreviewVisibility.AssetInstanceKey
 import io.noties.markwon.Markwon
@@ -49,6 +51,7 @@ class HybridNoteAdapter(
     private val context: Context,
     private val onActivate: (Int) -> Unit,
     private val onPreviewDoubleTap: (Int) -> Unit,
+    private val onToggleTask: (Int) -> Unit,
     private val onLineChanged: (Int, String, MarkdownHistoryKind, Int, Int) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
@@ -213,7 +216,9 @@ class HybridNoteAdapter(
         return when (val row = rows[position]) {
             is HybridRow.Editor -> TYPE_EDITOR
             is HybridRow.Rendered -> when (row.preview) {
-                is PreviewRow.Markdown -> TYPE_MARKDOWN
+                is PreviewRow.Markdown -> if (
+                    MarkdownTaskLine.parse(row.preview.source) != null
+                ) TYPE_TASK else TYPE_MARKDOWN
                 is PreviewRow.Image -> TYPE_IMAGE
                 is PreviewRow.PdfPage -> TYPE_PDF
                 is PreviewRow.Attachment -> TYPE_ATTACHMENT
@@ -254,6 +259,15 @@ class HybridNoteAdapter(
                 minHeight = dp(40)
                 gravity = Gravity.CENTER_VERTICAL
                 textSize = 17f
+            })
+            TYPE_TASK -> TaskHolder(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.TOP
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(horizontalPadding, dp(4), horizontalPadding, dp(4))
             })
             TYPE_END_ZONE -> TextHolder(TextView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
@@ -304,6 +318,7 @@ class HybridNoteAdapter(
         super.onBindViewHolder(holder, position, payloads)
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun bindContent(holder: RecyclerView.ViewHolder, row: HybridRow) {
         when (row) {
             is HybridRow.Editor -> {
@@ -315,24 +330,37 @@ class HybridNoteAdapter(
                 if (editing) {
                     holder.itemView.setOnTouchListener(null)
                     holder.itemView.setOnClickListener(activationListener)
+                    if (holder is TaskHolder) {
+                        holder.text.setOnTouchListener(null)
+                        holder.text.setOnClickListener(activationListener)
+                    }
                 } else {
                     holder.itemView.setOnClickListener(null)
-                    holder.itemView.setOnTouchListener(
-                        doubleTapListener { onPreviewDoubleTap(row.lineIndex) }
-                    )
+                    val previewDoubleTap = doubleTapListener {
+                        onPreviewDoubleTap(row.lineIndex)
+                    }
+                    holder.itemView.setOnTouchListener(previewDoubleTap)
+                    if (holder is TaskHolder) {
+                        holder.text.setOnClickListener(null)
+                        holder.text.setOnTouchListener(previewDoubleTap)
+                    }
                 }
                 when (val preview = row.preview) {
                     is PreviewRow.Markdown -> {
-                        holder as TextHolder
-                        val blank = preview.source == "\u00a0"
-                        holder.text.setTextIsSelectable(!editing && !blank)
-                        val pasteListener = pasteAtBoundaryListener(row.lineIndex) ?: if (blank) {
-                            View.OnLongClickListener { onPasteAt(row.lineIndex); true }
-                        } else null
-                        holder.text.setOnLongClickListener(pasteListener)
-                        holder.itemView.setOnLongClickListener(pasteListener)
-                        holder.text.setTextColor(ThemeColors.resolve(context, R.attr.inkNoteTextPrimary))
-                        markwon.setMarkdown(holder.text, preview.source)
+                        if (holder is TaskHolder) {
+                            bindTask(holder, row.lineIndex, preview)
+                        } else {
+                            holder as TextHolder
+                            val blank = preview.source == "\u00a0"
+                            holder.text.setTextIsSelectable(!editing && !blank)
+                            val pasteListener = pasteAtBoundaryListener(row.lineIndex) ?: if (blank) {
+                                View.OnLongClickListener { onPasteAt(row.lineIndex); true }
+                            } else null
+                            holder.text.setOnLongClickListener(pasteListener)
+                            holder.itemView.setOnLongClickListener(pasteListener)
+                            holder.text.setTextColor(ThemeColors.resolve(context, R.attr.inkNoteTextPrimary))
+                            markwon.setMarkdown(holder.text, preview.source)
+                        }
                     }
                     is PreviewRow.Attachment -> {
                         holder as TextHolder
@@ -417,12 +445,14 @@ class HybridNoteAdapter(
                 return true
             }
         })
-        return View.OnTouchListener { _, event ->
+        return View.OnTouchListener { view, event ->
             detector.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
             false
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnLongClickListener(null)
@@ -433,6 +463,12 @@ class HybridNoteAdapter(
                 activeEditorLine = null
             }
             holder.detach()
+        }
+        if (holder is TaskHolder) {
+            holder.checkbox.setOnCheckedChangeListener(null)
+            holder.text.setOnClickListener(null)
+            holder.text.setOnLongClickListener(null)
+            holder.text.setOnTouchListener(null)
         }
         if (holder is AssetHolder) {
             holder.caption.setOnClickListener(null)
@@ -481,6 +517,25 @@ class HybridNoteAdapter(
                 }
             }
         }
+    }
+
+    private fun bindTask(holder: TaskHolder, lineIndex: Int, row: PreviewRow.Markdown) {
+        val task = requireNotNull(MarkdownTaskLine.parse(row.source))
+        holder.checkbox.setOnCheckedChangeListener(null)
+        holder.checkbox.isChecked = task.isCompleted
+        holder.checkbox.contentDescription = context.getString(
+            if (task.isCompleted) R.string.mark_task_incomplete else R.string.mark_task_complete
+        )
+        holder.checkbox.setOnCheckedChangeListener { _, checked ->
+            if (checked != task.isCompleted) onToggleTask(lineIndex)
+        }
+        holder.text.setTextIsSelectable(!editing)
+        holder.text.setTextColor(ThemeColors.resolve(context, R.attr.inkNoteTextPrimary))
+        markwon.setMarkdown(holder.text, task.content.ifBlank { "\u00a0" })
+
+        val pasteListener = pasteAtBoundaryListener(lineIndex)
+        holder.text.setOnLongClickListener(pasteListener)
+        holder.itemView.setOnLongClickListener(pasteListener)
     }
 
     private fun bindImage(holder: AssetHolder, lineIndex: Int, row: PreviewRow.Image) {
@@ -821,6 +876,37 @@ class HybridNoteAdapter(
 
     private class TextHolder(val text: TextView) : RecyclerView.ViewHolder(text)
 
+    private class TaskHolder(container: LinearLayout) : RecyclerView.ViewHolder(container) {
+        val checkbox = AppCompatCheckBox(container.context).apply {
+            minWidth = (40 * resources.displayMetrics.density).toInt()
+            minHeight = (40 * resources.displayMetrics.density).toInt()
+            gravity = Gravity.CENTER
+        }
+        val text = TextView(container.context).apply {
+            minHeight = (40 * resources.displayMetrics.density).toInt()
+            gravity = Gravity.CENTER_VERTICAL
+            textSize = 17f
+        }
+
+        init {
+            container.addView(
+                checkbox,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            container.addView(
+                text,
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+        }
+    }
+
     private class AssetHolder(container: LinearLayout) : RecyclerView.ViewHolder(container) {
         private val header = LinearLayout(container.context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -903,6 +989,7 @@ class HybridNoteAdapter(
         const val TYPE_ERROR = 4
         const val TYPE_ATTACHMENT = 5
         const val TYPE_END_ZONE = 6
+        const val TYPE_TASK = 7
     }
 
     private data class PendingEdit(

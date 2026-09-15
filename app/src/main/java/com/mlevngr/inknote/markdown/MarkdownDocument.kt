@@ -27,6 +27,12 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         lines[index] = source
     }
 
+    fun toggleTask(index: Int): Boolean {
+        val toggled = lines.getOrNull(index)?.let(MarkdownTaskLine::toggle) ?: return false
+        lines[index] = toggled
+        return true
+    }
+
     fun insertAfter(index: Int?, source: String): Int {
         require('\n' !in source && '\r' !in source) { "A line cannot contain a line break" }
         val position = if (index == null) lines.size else (index + 1).coerceAtMost(lines.size)

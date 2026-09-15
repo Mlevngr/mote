@@ -154,6 +154,7 @@ class EditorActivity : AppCompatActivity() {
             context = this,
             onActivate = ::activateLine,
             onPreviewDoubleTap = ::enterEditModeAt,
+            onToggleTask = ::toggleTask,
             onLineChanged = ::updateLine,
             onSplitLine = ::splitLine,
             onMultilineInput = ::replaceLineFromEditor,
@@ -815,6 +816,24 @@ class EditorActivity : AppCompatActivity() {
         updateHistoryFocus()
         updateMarkdownToolbar()
         refreshRows(requestFocus = true)
+    }
+
+    private fun toggleTask(index: Int) {
+        if (index !in 0 until document.size) return
+        val editorState = activeLine?.let(noteAdapter::activeEditState)
+        updateHistoryFocus(editorState)
+        if (!document.toggleTask(index)) return
+
+        val historyLine = activeLine
+        val cursor = editorState?.selectionEnd ?: 0
+        val selectionStart = editorState?.selectionStart ?: cursor
+        recordHistory(MarkdownHistoryKind.Structural, historyLine, cursor, selectionStart)
+        refreshRows(
+            requestFocus = mode == EditorMode.Edit && historyLine != null,
+            cursorPosition = cursor,
+            selectionStart = selectionStart
+        )
+        scheduleSave()
     }
 
     private fun updateLine(
