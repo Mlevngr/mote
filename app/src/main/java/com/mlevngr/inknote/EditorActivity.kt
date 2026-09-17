@@ -950,10 +950,19 @@ class EditorActivity : AppCompatActivity() {
         activeLine = result.lineIndex
         lastActiveLine = activeLine ?: 0
         recordHistory(MarkdownHistoryKind.Structural, activeLine, result.cursor)
-        noteAdapter.retargetActiveEditor(result.lineIndex, document[result.lineIndex], result.cursor)
+        renderRevision.incrementAndGet()
+        val patched = noteAdapter.applyDeletion(
+            oldEditorLine = index,
+            newEditorLine = result.lineIndex,
+            removedLineStart = result.lineIndex,
+            removedLineCount = index - result.lineIndex,
+            newSource = document[result.lineIndex],
+            cursor = result.cursor
+        )
         cleanupRemovedImages(result.removedImages)
         updateMarkdownToolbar()
-        scheduleDeleteRefresh(result.cursor)
+        if (patched) scheduleDeleteRefresh(result.cursor)
+        else refreshRows(requestFocus = true, cursorPosition = result.cursor)
         scheduleSave()
         return true
     }
@@ -961,14 +970,24 @@ class EditorActivity : AppCompatActivity() {
     private fun deleteImageFromEditor(index: Int): Boolean {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return false
         updateHistoryFocus()
+        val oldSize = document.size
         val result = document.deleteImageLine(index) ?: return false
         activeLine = result.lineIndex
         lastActiveLine = result.lineIndex
         recordHistory(MarkdownHistoryKind.Structural, result.lineIndex, result.cursor)
-        noteAdapter.retargetActiveEditor(result.lineIndex, document[result.lineIndex], result.cursor)
+        renderRevision.incrementAndGet()
+        val patched = noteAdapter.applyDeletion(
+            oldEditorLine = index,
+            newEditorLine = result.lineIndex,
+            removedLineStart = if (index < oldSize - 1) index + 1 else (index - 1).coerceAtLeast(0),
+            removedLineCount = if (oldSize > 1) 1 else 0,
+            newSource = document[result.lineIndex],
+            cursor = result.cursor
+        )
         cleanupRemovedImages(result.removedImages)
         updateMarkdownToolbar()
-        scheduleDeleteRefresh(result.cursor)
+        if (patched) scheduleDeleteRefresh(result.cursor)
+        else refreshRows(requestFocus = true, cursorPosition = result.cursor)
         scheduleSave()
         return true
     }

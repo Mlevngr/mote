@@ -190,12 +190,64 @@ class HybridNoteAdapter(
         )
     }
 
-    /** Keeps repeated Backspace events on the current input connection aimed at the new line. */
-    fun retargetActiveEditor(lineIndex: Int, source: String, cursor: Int) {
-        val holder = activeEditorHolder ?: return
-        if (activeEditor !== holder.editor || !holder.editor.isAttachedToWindow) return
-        activeEditorLine = lineIndex
-        holder.retarget(lineIndex, source, cursor)
+    /** Removes consumed preview rows now, keeping the focused editor holder for key repeats. */
+    fun applyDeletion(
+        oldEditorLine: Int,
+        newEditorLine: Int,
+        removedLineStart: Int,
+        removedLineCount: Int,
+        newSource: String,
+        cursor: Int
+    ): Boolean {
+        val holder = activeEditorHolder ?: return false
+        if (activeEditor !== holder.editor || activeEditorLine != oldEditorLine ||
+            !holder.editor.isAttachedToWindow
+        ) return false
+        if (rows.none { it is HybridRow.Editor && it.lineIndex == oldEditorLine }) return false
+        val removed = removedLineStart until removedLineStart + removedLineCount
+        if (oldEditorLine in removed) return false
+        val removedPositions = rows.indices.filter { rows[it].lineIndex in removed }
+        if (removedPositions.size != removedLineCount) return false
+        if (removedPositions.isNotEmpty() &&
+            removedPositions.last() - removedPositions.first() + 1 != removedPositions.size
+        ) return false
+
+        val updatedAllRows = HybridRowDeletion.apply(
+            allRows, oldEditorLine, newEditorLine, removedLineStart, removedLineCount, newSource
+        )
+        val updatedRows = AssetPreviewVisibility.visibleRows(updatedAllRows, collapsedAssets)
+        if (rows.size - updatedRows.size != removedPositions.size) return false
+        val editorPosition = updatedRows.indexOfFirst {
+            it is HybridRow.Editor && it.lineIndex == newEditorLine
+        }
+        if (editorPosition < 0) return false
+
+        allRows.filterIsInstance<HybridRow.Rendered>().forEach { row ->
+            val image = row.preview as? PreviewRow.Image ?: return@forEach
+            val oldKey = assetKey(row.lineIndex, image.file)
+            if (oldKey !in collapsedAssets) return@forEach
+            collapsedAssets.remove(oldKey)
+            if (row.lineIndex !in removed) {
+                val shifted = row.lineIndex -
+                    (row.lineIndex - removedLineStart).coerceIn(0, removedLineCount)
+                collapsedAssets += assetKey(shifted, image.file)
+            }
+        }
+
+        allRows = updatedAllRows
+        rows = updatedRows
+        activeEditorLine = newEditorLine
+        holder.retarget(newEditorLine, newSource, cursor)
+        focusLine = null
+        focusCursor = null
+        focusSelectionStart = null
+        if (removedPositions.isNotEmpty()) {
+            notifyItemRangeRemoved(removedPositions.first(), removedPositions.size)
+        }
+        if (editorPosition + 1 < rows.size) {
+            notifyItemRangeChanged(editorPosition + 1, rows.size - editorPosition - 1)
+        }
+        return true
     }
 
     private fun applyEdit(
