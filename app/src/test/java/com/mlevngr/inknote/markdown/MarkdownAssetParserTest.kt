@@ -50,6 +50,13 @@ class MarkdownAssetParserTest {
         assertEquals(listOf(PreviewBlock.Markdown(source)), MarkdownAssetParser.parse(source))
     }
 
+    @Test fun onlyWholeLocalImageLinesAreAtomicImages() {
+        assertEquals(true, MarkdownAssetParser.isImageLine("![[asset:assets/photo.jpg|Photo]]"))
+        assertEquals(true, MarkdownAssetParser.isImageLine("![Photo](assets/photo.jpg)"))
+        assertEquals(false, MarkdownAssetParser.isImageLine("Before ![Photo](assets/photo.jpg)"))
+        assertEquals(false, MarkdownAssetParser.isImageLine("![[asset:assets/paper.pdf|Paper]]"))
+    }
+
     @Test fun preservesOrderAcrossMixedContent() {
         assertEquals(
             listOf(

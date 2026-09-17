@@ -14,6 +14,18 @@ data class OrderedListSplit(
     val nextLine: String
 )
 
+data class TaskLineSplit(
+    val currentLine: String,
+    val nextLine: String?,
+    val nextCursor: Int
+)
+
+data class MultilineTaskInput(
+    val lines: List<String>,
+    val relativeLine: Int,
+    val cursor: Int
+)
+
 enum class MarkdownBlockStyle(val prefix: String) {
     Task("- [ ] "),
     Bullet("- "),
@@ -28,6 +40,7 @@ object MarkdownEditEngine {
     private val bulletPrefix = Regex("^[-+*]\\s+")
     private val orderedPrefix = Regex("^\\d+[.)]\\s+")
     private val orderedLine = Regex("^([ \\t]*)(\\d+)([.)])(\\s+)(.*)$")
+    private val taskLine = Regex("^([ \\t]*)([-+*]|\\d+[.)])([ \\t]+)\\[[ xX]](?:([ \\t]+)(.*))?$")
     private val quotePrefix = Regex("^>\\s+")
 
     fun bold(source: String, selectionStart: Int, selectionEnd: Int): MarkdownEditResult =
@@ -103,6 +116,68 @@ object MarkdownEditEngine {
         return OrderedListSplit(
             currentLine = current,
             nextLine = "${ordered.indent}$nextNumber${ordered.delimiter} $remainder"
+        )
+    }
+
+    fun splitTaskLine(source: String, cursor: Int): TaskLineSplit? {
+        val match = taskLine.matchEntire(source) ?: return null
+        val indent = match.groupValues[1]
+        val marker = match.groupValues[2]
+        val contentStart = match.groups[5]?.range?.first ?: source.length
+        if (source.substring(contentStart).isBlank()) {
+            return TaskLineSplit(indent, null, indent.length)
+        }
+        val splitAt = cursor.coerceIn(contentStart, source.length)
+        val nextMarker = if (marker.first().isDigit()) {
+            val number = marker.dropLast(1).toIntOrNull()
+            if (number != null && number < Int.MAX_VALUE) "${number + 1}${marker.last()}"
+            else marker
+        } else marker
+        val prefix = "$indent$nextMarker${match.groupValues[3]}[ ] "
+        return TaskLineSplit(
+            currentLine = source.substring(0, splitAt),
+            nextLine = prefix + source.substring(splitAt).removePrefix(" "),
+            nextCursor = prefix.length
+        )
+    }
+
+    /** Applies task continuation to line breaks inserted by an IME or a multiline paste. */
+    fun expandTaskLineBreaks(source: String, cursor: Int): MultilineTaskInput {
+        val parts = source.split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
+        if (parts.size == 2 && parts[1].isEmpty()) {
+            val emptyTask = splitTaskLine(parts[0], parts[0].length)
+            if (emptyTask != null && emptyTask.nextLine == null) {
+                return MultilineTaskInput(
+                    listOf(emptyTask.currentLine), 0, emptyTask.nextCursor
+                )
+            }
+        }
+        val lines = mutableListOf(parts.first())
+        val prefixLengths = MutableList(parts.size) { 0 }
+        for (partIndex in 1 until parts.size) {
+            val previous = lines.last()
+            val split = splitTaskLine(previous, previous.length)?.let { task ->
+                if (task.nextLine == null && parts[partIndex].isNotBlank()) {
+                    splitTaskLine(previous + parts[partIndex], previous.length)
+                } else task
+            }
+            if (split != null) {
+                lines[lines.lastIndex] = split.currentLine
+                val prefix = split.nextLine?.take(split.nextCursor).orEmpty()
+                prefixLengths[partIndex] = prefix.length
+                lines += prefix + parts[partIndex]
+            } else {
+                lines += parts[partIndex]
+            }
+        }
+        val safeCursor = cursor.coerceIn(0, source.length)
+        val beforeCursor = source.substring(0, safeCursor)
+        val relativeLine = beforeCursor.count { it == '\n' }
+        val rawCursor = beforeCursor.substringAfterLast('\n').length
+        return MultilineTaskInput(
+            lines,
+            relativeLine,
+            (prefixLengths[relativeLine] + rawCursor).coerceAtMost(lines[relativeLine].length)
         )
     }
 

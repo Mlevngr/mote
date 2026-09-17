@@ -124,6 +124,70 @@ class MarkdownDocumentTest {
         assertEquals(null, document.mergeWithPrevious(0))
     }
 
+    @Test fun longBackspaceCrossesLineBoundaryWithoutStoppingAtPreviousEnd() {
+        val document = MarkdownDocument.parse("First line\nSecond line")
+
+        val result = document.deleteBackwardAtLineStart(1, 6)
+
+        assertEquals(BackwardDeleteResult(0, 5), result)
+        assertEquals("FirstSecond line", document.markdown())
+    }
+
+    @Test fun backspaceBeforeAnImageRemovesTheWholeEmbed() {
+        val document = MarkdownDocument.parse("Before\n![[asset:assets/photo.jpg|Photo]]\nAfter")
+
+        val result = document.deleteBackwardAtLineStart(2, 1)
+
+        assertEquals(BackwardDeleteResult(1, 0, listOf("assets/photo.jpg")), result)
+        assertEquals("Before\nAfter", document.markdown())
+    }
+
+    @Test fun deletingAnActiveImageRemovesItsWholeSourceLine() {
+        val document = MarkdownDocument.parse("Before\n![Photo](assets/photo.jpg)\nAfter")
+
+        val result = document.deleteImageLine(1)
+
+        assertEquals(BackwardDeleteResult(1, 0, listOf("assets/photo.jpg")), result)
+        assertEquals("Before\nAfter", document.markdown())
+    }
+
+    @Test fun deletingTheOnlyImageLeavesAnEditableEmptyDocument() {
+        val document = MarkdownDocument.parse("![[asset:assets/photo.jpg|Photo]]")
+
+        val result = document.deleteImageLine(0)
+
+        assertEquals(BackwardDeleteResult(0, 0, listOf("assets/photo.jpg")), result)
+        assertEquals("", document.markdown())
+    }
+
+    @Test fun longBackspaceCanRemoveAnImageAndContinueIntoEarlierText() {
+        val document = MarkdownDocument.parse("Before\n![[asset:assets/photo.jpg|Photo]]\nAfter")
+
+        val result = document.deleteBackwardAtLineStart(2, 4)
+
+        assertEquals(BackwardDeleteResult(0, 4, listOf("assets/photo.jpg")), result)
+        assertEquals("BefoAfter", document.markdown())
+    }
+
+    @Test fun codePointBackspaceDoesNotSplitAnEmojiAcrossLines() {
+        val document = MarkdownDocument.parse("A😀\nNext")
+
+        val result = document.deleteBackwardAtLineStart(1, 2, byCodePoints = true)
+
+        assertEquals(BackwardDeleteResult(0, 1), result)
+        assertEquals("ANext", document.markdown())
+    }
+
+    @Test fun backspaceDoesNotCrossPdfPageNoteMarkers() {
+        val document = MarkdownDocument.parse(
+            "![[asset:assets/paper.pdf|Paper|mote-id:one]]\n" +
+                "<!-- mote:pdf-note:one:0 -->\nNote\n<!-- /mote:pdf-note:one -->\nAfter"
+        )
+
+        assertEquals(null, document.deleteBackwardAtLineStart(4, 1))
+        assertEquals("After", document[4])
+    }
+
     @Test fun backspaceCannotMergeTheFirstBodyLineIntoTheSeparateTitle() {
         val document = MarkdownDocument.parse("Body")
         assertEquals(null, document.mergeWithPrevious(0))

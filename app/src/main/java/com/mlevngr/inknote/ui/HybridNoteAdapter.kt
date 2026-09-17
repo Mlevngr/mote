@@ -33,6 +33,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.mlevngr.inknote.R
 import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.markdown.MarkdownAutoPairing
+import com.mlevngr.inknote.markdown.MarkdownAssetParser
 import com.mlevngr.inknote.markdown.MarkdownEditResult
 import com.mlevngr.inknote.markdown.MarkdownHistoryKind
 import com.mlevngr.inknote.markdown.MarkdownTaskLine
@@ -55,7 +56,8 @@ class HybridNoteAdapter(
     private val onLineChanged: (Int, String, MarkdownHistoryKind, Int, Int) -> Unit,
     private val onSplitLine: (Int, Int) -> Unit,
     private val onMultilineInput: (Int, String, Int) -> Unit,
-    private val onMergeWithPrevious: (Int) -> Boolean,
+    private val onMergeWithPrevious: (Int, Int, Boolean) -> Boolean,
+    private val onDeleteImage: (Int) -> Boolean,
     private val onAssetActions: (Int, File, String) -> Unit,
     private val onAddPdfPageNote: (Int, Int) -> Unit,
     private val onPasteAt: (Int?) -> Unit,
@@ -85,6 +87,7 @@ class HybridNoteAdapter(
     private var focusSelectionStart: Int? = null
     private var editing = false
     private var activeEditor: LineEditText? = null
+    private var activeEditorHolder: EditorHolder? = null
     private var activeEditorLine: Int? = null
     private var pendingEdit: PendingEdit? = null
     private var previewRenderScale = 1f
@@ -185,6 +188,14 @@ class HybridNoteAdapter(
             selectionStart = editor.selectionStart.coerceIn(0, source.length),
             selectionEnd = editor.selectionEnd.coerceIn(0, source.length)
         )
+    }
+
+    /** Keeps repeated Backspace events on the current input connection aimed at the new line. */
+    fun retargetActiveEditor(lineIndex: Int, source: String, cursor: Int) {
+        val holder = activeEditorHolder ?: return
+        if (activeEditor !== holder.editor || !holder.editor.isAttachedToWindow) return
+        activeEditorLine = lineIndex
+        holder.retarget(lineIndex, source, cursor)
     }
 
     private fun applyEdit(
@@ -460,6 +471,7 @@ class HybridNoteAdapter(
         if (holder is EditorHolder) {
             if (activeEditor === holder.editor) {
                 activeEditor = null
+                activeEditorHolder = null
                 activeEditorLine = null
             }
             holder.detach()
@@ -484,6 +496,7 @@ class HybridNoteAdapter(
 
     private fun bindEditor(holder: EditorHolder, row: HybridRow.Editor) {
         activeEditor = holder.editor
+        activeEditorHolder = holder
         activeEditorLine = row.lineIndex
         holder.bind(
             row.lineIndex,
@@ -491,7 +504,8 @@ class HybridNoteAdapter(
             onLineChanged,
             onSplitLine,
             onMultilineInput,
-            onMergeWithPrevious
+            onMergeWithPrevious,
+            onDeleteImage
         )
         if (focusLine == row.lineIndex) {
             focusLine = null
@@ -729,6 +743,8 @@ class HybridNoteAdapter(
 
     private class EditorHolder(val editor: LineEditText) : RecyclerView.ViewHolder(editor) {
         private var watcher: TextWatcher? = null
+        private var boundLineIndex = -1
+        private var suppressChange = false
 
         fun bind(
             lineIndex: Int,
@@ -736,14 +752,18 @@ class HybridNoteAdapter(
             onChanged: (Int, String, MarkdownHistoryKind, Int, Int) -> Unit,
             onSplit: (Int, Int) -> Unit,
             onMultiline: (Int, String, Int) -> Unit,
-            onMerge: (Int) -> Boolean
+            onMerge: (Int, Int, Boolean) -> Boolean,
+            onDeleteImage: (Int) -> Boolean
         ) {
             detach()
+            boundLineIndex = lineIndex
             var handlingLineBreak = false
+            var lineBreakCursor: Int? = null
             if (editor.text?.toString() != source) editor.setText(source)
             watcher = object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    if (suppressChange) return
                     val value = s?.toString().orEmpty()
                     if ('\n' !in value && '\r' !in value) {
                         val inferredKind = when {
@@ -754,31 +774,58 @@ class HybridNoteAdapter(
                         val fallbackCursor = (start + count).coerceIn(0, value.length)
                         val selection = editor.consumeHistorySelection(fallbackCursor)
                         onChanged(
-                            lineIndex,
+                            boundLineIndex,
                             value,
                             editor.consumeHistoryKind(inferredKind),
                             selection.first,
                             selection.second
                         )
+                    } else {
+                        lineBreakCursor = (start + count).coerceIn(0, value.length)
                     }
                 }
 
                 override fun afterTextChanged(s: Editable?) {
+                    if (suppressChange) return
                     val value = s?.toString().orEmpty()
                     if (!handlingLineBreak && ('\n' in value || '\r' in value)) {
                         handlingLineBreak = true
-                        onMultiline(lineIndex, value, editor.selectionStart.coerceAtLeast(0))
+                        onMultiline(
+                            boundLineIndex,
+                            value,
+                            lineBreakCursor ?: editor.selectionStart.coerceAtLeast(0)
+                        )
                     }
                 }
             }.also(editor::addTextChangedListener)
-            editor.onDeleteAtStart = { onMerge(lineIndex) }
+            editor.onDeleteAtStart = { count, byCodePoints ->
+                onMerge(boundLineIndex, count, byCodePoints)
+            }
+            editor.onDeleteImage = { onDeleteImage(boundLineIndex) }
+            editor.onInsertNewline = {
+                onSplit(boundLineIndex, editor.selectionStart.coerceAtLeast(0))
+                true
+            }
             editor.setOnEditorActionListener { _, actionId, event ->
                 val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER &&
                     event.action == KeyEvent.ACTION_DOWN
                 if (actionId == EditorInfo.IME_ACTION_NEXT || enter) {
-                    onSplit(lineIndex, editor.selectionStart.coerceAtLeast(0))
+                    onSplit(boundLineIndex, editor.selectionStart.coerceAtLeast(0))
                     true
                 } else false
+            }
+        }
+
+        fun retarget(lineIndex: Int, source: String, cursor: Int) {
+            boundLineIndex = lineIndex
+            suppressChange = true
+            try {
+                if (editor.text?.toString() != source) {
+                    editor.editableText.replace(0, editor.editableText.length, source)
+                }
+                editor.setSelection(cursor.coerceIn(0, editor.length()))
+            } finally {
+                suppressChange = false
             }
         }
 
@@ -787,11 +834,16 @@ class HybridNoteAdapter(
             watcher = null
             editor.setOnEditorActionListener(null)
             editor.onDeleteAtStart = null
+            editor.onDeleteImage = null
+            editor.onInsertNewline = null
+            boundLineIndex = -1
         }
     }
 
     private class LineEditText(context: Context) : ImeBackTextInputEditText(context) {
-        var onDeleteAtStart: (() -> Boolean)? = null
+        var onDeleteAtStart: ((Int, Boolean) -> Boolean)? = null
+        var onDeleteImage: (() -> Boolean)? = null
+        var onInsertNewline: (() -> Boolean)? = null
         var nextHistoryKind: MarkdownHistoryKind? = null
         var nextHistorySelection: Pair<Int, Int>? = null
 
@@ -833,14 +885,19 @@ class HybridNoteAdapter(
             return true
         }
 
-        private fun deleteAtStart(): Boolean {
+        private fun deleteAtStart(beforeLength: Int, byCodePoints: Boolean = false): Boolean {
             if (selectionStart != 0 || selectionEnd != 0) return false
-            return onDeleteAtStart?.invoke() == true
+            return onDeleteAtStart?.invoke(beforeLength, byCodePoints) == true
+        }
+
+        private fun deleteImage(): Boolean {
+            if (!MarkdownAssetParser.isImageLine(text?.toString().orEmpty())) return false
+            return onDeleteImage?.invoke() == true
         }
 
         override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
             if (keyCode == KeyEvent.KEYCODE_DEL) {
-                if (deleteEmptyPair() || deleteAtStart()) return true
+                if (deleteImage() || deleteEmptyPair() || deleteAtStart(1)) return true
             } else if (!event.isCtrlPressed && !event.isAltPressed) {
                 val unicode = event.unicodeChar
                 if (unicode > 0 && typeWithAutoPair(unicode.toChar().toString())) return true
@@ -852,13 +909,19 @@ class HybridNoteAdapter(
             val target = super.onCreateInputConnection(outAttrs) ?: return null
             return object : InputConnectionWrapper(target, false) {
                 override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                    if (text?.toString() == "\n" && selectionStart == selectionEnd &&
+                        onInsertNewline?.invoke() == true
+                    ) return true
                     if (typeWithAutoPair(text)) return true
                     return super.commitText(text, newCursorPosition)
                 }
 
                 override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                    if (beforeLength > 0 && afterLength == 0 && deleteImage()) return true
                     if (beforeLength == 1 && afterLength == 0 && deleteEmptyPair()) return true
-                    if (beforeLength > 0 && deleteAtStart()) return true
+                    if (beforeLength > 0 && afterLength == 0 &&
+                        deleteAtStart(beforeLength)
+                    ) return true
                     return super.deleteSurroundingText(beforeLength, afterLength)
                 }
 
@@ -866,8 +929,11 @@ class HybridNoteAdapter(
                     beforeLength: Int,
                     afterLength: Int
                 ): Boolean {
+                    if (beforeLength > 0 && afterLength == 0 && deleteImage()) return true
                     if (beforeLength == 1 && afterLength == 0 && deleteEmptyPair()) return true
-                    if (beforeLength > 0 && deleteAtStart()) return true
+                    if (beforeLength > 0 && afterLength == 0 &&
+                        deleteAtStart(beforeLength, byCodePoints = true)
+                    ) return true
                     return super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
                 }
             }

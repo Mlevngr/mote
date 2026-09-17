@@ -12,6 +12,12 @@ data class PdfPageNoteRemoval(
     val focusCursor: Int
 )
 
+data class BackwardDeleteResult(
+    val lineIndex: Int,
+    val cursor: Int,
+    val removedImages: List<String> = emptyList()
+)
+
 /** A lossless, line-oriented Markdown model used by the hybrid editor. */
 class MarkdownDocument private constructor(private val lines: MutableList<String>) {
     val size: Int get() = lines.size
@@ -110,6 +116,63 @@ class MarkdownDocument private constructor(private val lines: MutableList<String
         lines[index - 1] += lines[index]
         lines.removeAt(index)
         return cursor
+    }
+
+    /** Deletes across a line boundary, treating image embeds as one indivisible item. */
+    fun deleteBackwardAtLineStart(
+        index: Int,
+        beforeLength: Int,
+        byCodePoints: Boolean = false
+    ): BackwardDeleteResult? {
+        if (index !in 1 until lines.size || beforeLength <= 0) return null
+        var lineIndex = index
+        var cursor = 0
+        var remaining = beforeLength
+        var changed = false
+        val removedImages = mutableListOf<String>()
+        while (remaining > 0 && lineIndex > 0) {
+            val previous = lines[lineIndex - 1]
+            if (PdfPageNotes.isMarker(previous)) break
+            val image = MarkdownAssetParser.imageLine(previous)
+            if (image != null) {
+                removedImages += image.relativePath
+                removeAssetBlock(lineIndex - 1)
+                lineIndex--
+                cursor = 0
+                remaining--
+                changed = true
+                continue
+            }
+            lines[lineIndex - 1] = previous + lines[lineIndex]
+            lines.removeAt(lineIndex)
+            lineIndex--
+            cursor = previous.length
+            remaining-- // The removed line break.
+            changed = true
+            val available = if (byCodePoints) {
+                Character.codePointCount(lines[lineIndex], 0, cursor)
+            } else cursor
+            val deleted = remaining.coerceAtMost(available)
+            if (deleted > 0) {
+                val start = if (byCodePoints) {
+                    Character.offsetByCodePoints(lines[lineIndex], cursor, -deleted)
+                } else cursor - deleted
+                lines[lineIndex] = lines[lineIndex].removeRange(start, cursor)
+                cursor = start
+                remaining -= deleted
+            }
+        }
+        return if (changed) BackwardDeleteResult(lineIndex, cursor, removedImages) else null
+    }
+
+    fun deleteImageLine(index: Int): BackwardDeleteResult? {
+        val image = lines.getOrNull(index)?.let(MarkdownAssetParser::imageLine) ?: return null
+        removeAssetBlock(index)
+        return if (index < lines.size) {
+            BackwardDeleteResult(index, 0, listOf(image.relativePath))
+        } else {
+            BackwardDeleteResult(lines.lastIndex, lines.last().length, listOf(image.relativePath))
+        }
     }
 
     fun replaceLine(index: Int, replacement: List<String>): IntRange {

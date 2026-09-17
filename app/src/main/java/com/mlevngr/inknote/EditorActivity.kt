@@ -92,6 +92,7 @@ class EditorActivity : AppCompatActivity() {
     private var activeLine: Int? = null
     private var lastActiveLine = 0
     private var saveTask: Runnable? = null
+    private var deleteRefreshTask: Runnable? = null
     private var previewScaleTask: Runnable? = null
     private var availablePlugins: List<DiscoveredPlugin> = emptyList()
     private val pluginSessionId = UUID.randomUUID().toString()
@@ -159,6 +160,7 @@ class EditorActivity : AppCompatActivity() {
             onSplitLine = ::splitLine,
             onMultilineInput = ::replaceLineFromEditor,
             onMergeWithPrevious = ::mergeWithPrevious,
+            onDeleteImage = ::deleteImageFromEditor,
             onAssetActions = ::showAssetActions,
             onAddPdfPageNote = ::addPdfPageNote,
             onPasteAt = ::showPasteAt,
@@ -860,6 +862,9 @@ class EditorActivity : AppCompatActivity() {
             )
         }
         scheduleSave()
+        if (kind == MarkdownHistoryKind.Delete && deleteRefreshTask != null) {
+            scheduleDeleteRefresh(update.edit.selectionEnd)
+        }
         ensureActiveEditorVisible()
     }
 
@@ -868,8 +873,28 @@ class EditorActivity : AppCompatActivity() {
         updateHistoryFocus(
             MarkdownEditResult(document[index], cursor, cursor)
         )
-        val orderedSplit = MarkdownEditEngine.splitOrderedLine(document[index], cursor)
-        val cursorPosition = if (orderedSplit == null) {
+        val taskSplit = MarkdownEditEngine.splitTaskLine(document[index], cursor)
+        val orderedSplit = if (taskSplit == null) {
+            MarkdownEditEngine.splitOrderedLine(document[index], cursor)
+        } else null
+        val cursorPosition = if (taskSplit != null) {
+            if (taskSplit.nextLine == null) {
+                val oldNumber = MarkdownEditEngine.orderedNumber(document[index])
+                val oldIndent = MarkdownEditEngine.orderedIndent(document[index])
+                document.update(index, taskSplit.currentLine)
+                if (oldNumber != null &&
+                    document.getOrNull(index + 1)?.let(MarkdownEditEngine::orderedIndent) == oldIndent
+                ) {
+                    document.renumberOrderedListAt(index + 1, startingNumber = oldNumber)
+                }
+                activeLine = index
+            } else {
+                document.replaceLine(index, listOf(taskSplit.currentLine, taskSplit.nextLine))
+                activeLine = index + 1
+                document.renumberOrderedListAt(index + 1)
+            }
+            taskSplit.nextCursor
+        } else if (orderedSplit == null) {
             activeLine = document.splitLine(index, cursor)
             0
         } else {
@@ -885,8 +910,8 @@ class EditorActivity : AppCompatActivity() {
         scheduleSave()
     }
 
-    private fun mergeWithPrevious(index: Int): Boolean {
-        if (mode != EditorMode.Edit) return false
+    private fun mergeWithPrevious(index: Int, beforeLength: Int, byCodePoints: Boolean): Boolean {
+        if (mode != EditorMode.Edit || index !in 0 until document.size) return false
         updateHistoryFocus(
             MarkdownEditResult(document[index], 0, 0)
         )
@@ -915,17 +940,35 @@ class EditorActivity : AppCompatActivity() {
         val deletedLine = document.getOrNull(index)
         val deletedNumber = deletedLine?.let(MarkdownEditEngine::orderedNumber)
         val deletedIndent = deletedLine?.let(MarkdownEditEngine::orderedIndent)
-        val cursor = document.mergeWithPrevious(index) ?: return false
-        if (deletedNumber != null &&
+        val result = document.deleteBackwardAtLineStart(index, beforeLength, byCodePoints)
+            ?: return false
+        if (beforeLength == 1 && deletedNumber != null &&
             document.getOrNull(index)?.let(MarkdownEditEngine::orderedIndent) == deletedIndent
         ) {
             document.renumberOrderedListAt(index, startingNumber = deletedNumber)
         }
-        activeLine = index - 1
+        activeLine = result.lineIndex
         lastActiveLine = activeLine ?: 0
-        recordHistory(MarkdownHistoryKind.Structural, activeLine, cursor)
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, result.cursor)
+        noteAdapter.retargetActiveEditor(result.lineIndex, document[result.lineIndex], result.cursor)
+        cleanupRemovedImages(result.removedImages)
         updateMarkdownToolbar()
-        refreshRows(requestFocus = true, cursorPosition = cursor)
+        scheduleDeleteRefresh(result.cursor)
+        scheduleSave()
+        return true
+    }
+
+    private fun deleteImageFromEditor(index: Int): Boolean {
+        if (mode != EditorMode.Edit || index !in 0 until document.size) return false
+        updateHistoryFocus()
+        val result = document.deleteImageLine(index) ?: return false
+        activeLine = result.lineIndex
+        lastActiveLine = result.lineIndex
+        recordHistory(MarkdownHistoryKind.Structural, result.lineIndex, result.cursor)
+        noteAdapter.retargetActiveEditor(result.lineIndex, document[result.lineIndex], result.cursor)
+        cleanupRemovedImages(result.removedImages)
+        updateMarkdownToolbar()
+        scheduleDeleteRefresh(result.cursor)
         scheduleSave()
         return true
     }
@@ -933,19 +976,14 @@ class EditorActivity : AppCompatActivity() {
     private fun replaceLineFromEditor(index: Int, source: String, cursor: Int) {
         if (mode != EditorMode.Edit || index !in 0 until document.size) return
         val normalized = source.replace("\r\n", "\n").replace('\r', '\n')
-        val replacement = normalized.split('\n', ignoreCase = false, limit = Int.MAX_VALUE)
-        if (replacement.size < 2) return
-        document.replaceLine(index, replacement)
-
-        val safeCursor = cursor.coerceIn(0, normalized.length)
-        val beforeCursor = normalized.substring(0, safeCursor)
-        val relativeLine = beforeCursor.count { it == '\n' }
-        val cursorInLine = beforeCursor.substringAfterLast('\n').length
-        activeLine = index + relativeLine
+        if ('\n' !in normalized) return
+        val expanded = MarkdownEditEngine.expandTaskLineBreaks(normalized, cursor)
+        document.replaceLine(index, expanded.lines)
+        activeLine = index + expanded.relativeLine
         lastActiveLine = activeLine ?: index
-        recordHistory(MarkdownHistoryKind.Structural, activeLine, cursorInLine)
+        recordHistory(MarkdownHistoryKind.Structural, activeLine, expanded.cursor)
         updateMarkdownToolbar()
-        refreshRows(requestFocus = true, cursorPosition = cursorInLine)
+        refreshRows(requestFocus = true, cursorPosition = expanded.cursor)
         scheduleSave()
     }
 
@@ -967,6 +1005,8 @@ class EditorActivity : AppCompatActivity() {
         cursorPosition: Int? = null,
         selectionStart: Int? = null
     ) {
+        deleteRefreshTask?.let(main::removeCallbacks)
+        deleteRefreshTask = null
         val revision = renderRevision.incrementAndGet()
         val lines = document.snapshot()
         val active = activeLine
@@ -986,6 +1026,16 @@ class EditorActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun scheduleDeleteRefresh(fallbackCursor: Int) {
+        deleteRefreshTask?.let(main::removeCallbacks)
+        deleteRefreshTask = Runnable {
+            deleteRefreshTask = null
+            val line = activeLine
+            val cursor = line?.let(noteAdapter::activeEditState)?.selectionEnd ?: fallbackCursor
+            refreshRows(requestFocus = line != null, cursorPosition = cursor)
+        }.also { main.postDelayed(it, DELETE_REFRESH_DEBOUNCE_MS) }
     }
 
     private fun ensureActiveEditorVisible(retry: Boolean = true) {
@@ -1226,6 +1276,18 @@ class EditorActivity : AppCompatActivity() {
         activeLine = activeLineAfterRemoval(activeLine, lineIndex, removedCount)
         lastActiveLine = lastActiveLine.coerceAtMost(document.size - 1)
         recordHistory(MarkdownHistoryKind.Structural, activeLine, 0)
+        cleanupUnreferencedAssets(listOf(file))
+        refreshRows()
+        scheduleSave()
+    }
+
+    private fun cleanupRemovedImages(relativePaths: List<String>) {
+        if (relativePaths.isEmpty()) return
+        cleanupUnreferencedAssets(relativePaths.mapNotNull(workspace::resolveAsset))
+    }
+
+    private fun cleanupUnreferencedAssets(files: List<File>) {
+        if (files.isEmpty()) return
         val remainingMarkdown = document.markdown()
         val retainedClipboardReference = listOfNotNull(
             pendingAssetTransfer?.source,
@@ -1234,16 +1296,16 @@ class EditorActivity : AppCompatActivity() {
         ).joinToString("\n")
         io.execute {
             synchronized(workspaceLock) {
-                runCatching {
-                    workspace.deleteAssetIfUnreferenced(
-                        file,
-                        "$remainingMarkdown\n$retainedClipboardReference"
-                    )
+                files.distinct().forEach { file ->
+                    runCatching {
+                        workspace.deleteAssetIfUnreferenced(
+                            file,
+                            "$remainingMarkdown\n$retainedClipboardReference"
+                        )
+                    }
                 }
             }
         }
-        refreshRows()
-        scheduleSave()
     }
 
     private fun activeLineAfterRemoval(active: Int?, start: Int, count: Int): Int? =
@@ -1281,6 +1343,7 @@ class EditorActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         saveTask?.let(main::removeCallbacks)
+        deleteRefreshTask?.let(main::removeCallbacks)
         previewScaleTask?.let(main::removeCallbacks)
         dismissPluginProgress()
         pluginResultGate.invalidate(UUID.randomUUID().toString())
@@ -1300,6 +1363,7 @@ class EditorActivity : AppCompatActivity() {
     companion object {
         private const val DISABLED_ALPHA = 0.38f
         private const val SAVE_DELAY_MS = 350L
+        private const val DELETE_REFRESH_DEBOUNCE_MS = 220L
         private const val PREVIEW_SCALE_DEBOUNCE_MS = 100L
         private const val EXTRA_FOLDER_NAMES = "folder_names"
         private const val EXTRA_NOTE_NAME = "note_name"

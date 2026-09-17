@@ -81,6 +81,62 @@ class MarkdownEditEngineTest {
         assertEquals("2. ", result?.nextLine)
     }
 
+    @Test fun enterAfterTaskCreatesAnUncheckedTask() {
+        val result = MarkdownEditEngine.splitTaskLine("  - [x] Buy milk", 16)
+
+        assertEquals("  - [x] Buy milk", result?.currentLine)
+        assertEquals("  - [ ] ", result?.nextLine)
+        assertEquals(8, result?.nextCursor)
+    }
+
+    @Test fun enterWithinTaskMovesTheRemainderIntoTheNextTask() {
+        val result = MarkdownEditEngine.splitTaskLine("+ [ ] First second", 11)
+
+        assertEquals("+ [ ] First", result?.currentLine)
+        assertEquals("+ [ ] second", result?.nextLine)
+        assertEquals(6, result?.nextCursor)
+    }
+
+    @Test fun enterOnEmptyTaskExitsTheTaskList() {
+        val result = MarkdownEditEngine.splitTaskLine("  - [ ] ", 8)
+
+        assertEquals("  ", result?.currentLine)
+        assertEquals(null, result?.nextLine)
+        assertEquals(2, result?.nextCursor)
+    }
+
+    @Test fun enterOnNumberedTaskKeepsCheckboxAndAdvancesNumber() {
+        val result = MarkdownEditEngine.splitTaskLine("3. [X] Task", 11)
+
+        assertEquals("3. [X] Task", result?.currentLine)
+        assertEquals("4. [ ] ", result?.nextLine)
+        assertEquals(7, result?.nextCursor)
+    }
+
+    @Test fun imeNewlineContinuesATaskAndKeepsTheCursorAfterItsCheckbox() {
+        val result = MarkdownEditEngine.expandTaskLineBreaks("- [x] Buy\n", 10)
+
+        assertEquals(listOf("- [x] Buy", "- [ ] "), result.lines)
+        assertEquals(1, result.relativeLine)
+        assertEquals(6, result.cursor)
+    }
+
+    @Test fun imeNewlineAtTaskContentStartMovesExistingContentToNextTask() {
+        val result = MarkdownEditEngine.expandTaskLineBreaks("- [ ] \nBuy", 7)
+
+        assertEquals(listOf("- [ ] ", "- [ ] Buy"), result.lines)
+        assertEquals(1, result.relativeLine)
+        assertEquals(6, result.cursor)
+    }
+
+    @Test fun imeNewlineOnEmptyTaskExitsWithoutAnExtraLine() {
+        val result = MarkdownEditEngine.expandTaskLineBreaks("  - [ ] \n", 9)
+
+        assertEquals(listOf("  "), result.lines)
+        assertEquals(0, result.relativeLine)
+        assertEquals(2, result.cursor)
+    }
+
     @Test fun enterInTheMiddleMovesTheRemainderIntoTheNewOrderedItem() {
         val result = MarkdownEditEngine.splitOrderedLine("8) first second", 8)
 

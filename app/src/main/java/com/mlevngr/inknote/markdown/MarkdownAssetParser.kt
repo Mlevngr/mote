@@ -9,6 +9,11 @@ object MarkdownAssetParser {
     private val link = Regex("""^\s*\[([^]]*)]\((assets/[^)]+)\)\s*$""")
     private val imageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "heic", "heif")
 
+    fun imageLine(source: String): PreviewBlock.Image? =
+        parse(source).singleOrNull() as? PreviewBlock.Image
+
+    fun isImageLine(source: String): Boolean = imageLine(source) != null
+
     fun parse(source: String): List<PreviewBlock> {
         if (source.isEmpty()) return emptyList()
         val result = mutableListOf<PreviewBlock>()
