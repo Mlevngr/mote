@@ -38,3 +38,20 @@ class ReleaseTests(unittest.TestCase):
     def test_stable_to_same_version_prerelease_is_rejected(self):
         with self.assertRaises(ValueError):
             release.validate("0.9.0-beta.1", 60, "v0.9.0-beta.1", ("0.9.0", 59))
+
+    def test_old_and_build_tools_37_signer_formats(self):
+        digest = "a" * 64
+        for label in ("Signer #1", "V3.0 Signer:", "Signer (minSdkVersion=28, maxSdkVersion=32)"):
+            self.assertEqual({digest}, release.signer_digests(f"{label} certificate SHA-256 digest: {digest}\n"))
+
+    def test_multiple_schemes_must_all_use_the_locked_signer(self):
+        old, other = "a" * 64, "b" * 64
+        text = f"V3.0 Signer: certificate SHA-256 digest: {old}\n"
+        self.assertEqual({old}, release.signer_digests(text + text))
+        self.assertNotEqual({old}, release.signer_digests(
+            text + f"V3.1 Signer: certificate SHA-256 digest: {other}\n"))
+
+    def test_missing_or_source_stamp_only_signers_fail_closed(self):
+        self.assertEqual(set(), release.signer_digests(""))
+        self.assertEqual(set(), release.signer_digests(
+            "Source Stamp Signer certificate SHA-256 digest: " + "a" * 64))

@@ -65,6 +65,14 @@ def build_tools():
     return max(candidates, key=lambda p: tuple(map(int, p.name.split("."))))
 
 
+def signer_digests(output):
+    # Build Tools 37 labels signers by scheme; older tools number them.
+    # Source-stamp certificates are not installation signers and must not count.
+    return set(re.findall(
+        r"^(?:Signer #\d+|Signer \(minSdkVersion=[^\n]+\)|V\d+(?:\.\d+)? Signer:)"
+        r" certificate SHA-256 digest: ([0-9a-f]{64})$", output, re.M))
+
+
 def package(output, name, code, tag):
     changes = run("git", "status", "--porcelain", "--untracked-files=all")
     if changes:
@@ -96,8 +104,8 @@ def package(output, name, code, tag):
         if module == "app" and (element["versionName"], element["versionCode"]) != (name, code):
             raise ValueError("Main APK is stale: rebuild after changing version.properties")
         signature = run(str(tools / "apksigner"), "verify", "--print-certs", str(apk))
-        digests = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-f]+)", signature)
-        if digests != [expected_signer]:
+        digests = signer_digests(signature)
+        if digests != {expected_signer}:
             raise ValueError(f"Signing certificate check failed for {module} using {tools}; expected {expected_signer}, parsed {digests}. Tool output:\n{signature}")
         staged.append((apk, filename))
     output.mkdir(parents=True, exist_ok=True)

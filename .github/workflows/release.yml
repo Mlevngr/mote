@@ -71,7 +71,14 @@ jobs:
           if [[ "$GITHUB_REF" == refs/heads/* ]]; then
             # A temporary local tag exercises packaging before a public tag is created.
             # Never move an existing local or remote release tag.
-            git tag "$tag"
+            if git rev-parse --verify "$tag^{commit}" > /dev/null 2>&1; then
+              if [[ "$(git rev-parse "$tag^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+                echo 'Version already tagged; bump the version before the next release preflight.'
+                exit 0
+              fi
+            else
+              git tag "$tag"
+            fi
           fi
           python3 scripts/release.py package --tag "$tag"
 
