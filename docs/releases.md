@@ -8,7 +8,7 @@
 4. 添加后可由 Obtainium 下载、安装和检查更新。Android 仍可能要求授予安装未知应用权限或确认安装，不保证无人值守安装。
 
 固定下载入口：[最新正式版 Mote.apk](https://github.com/Mlevngr/mote/releases/latest/download/Mote.apk)。
-两个插件是不同应用：各自使用同一仓库来源，但过滤分别为 `^Mote-AI-Organizer\.apk$` 和 `^Mote-Local-Organizer\.apk$`；主程序过滤不会误选插件。
+两个插件是不同应用：过滤分别为 `^Mote-AI-Organizer\.apk$` 和 `^Mote-Local-Organizer\.apk$`；主程序过滤不会误选插件。插件 APK 的版本独立于主程序发布标签，若用 Obtainium 跟踪插件需单独关闭版本检测、按发布标签跟踪，或者手动下载；主程序不要关闭版本检测。
 
 依据：[Obtainium 官方来源说明](https://wiki.obtainium.imranr.dev/sources/)、[版本跟踪说明](https://wiki.obtainium.imranr.dev/app_tracking/)。
 
@@ -53,7 +53,7 @@ Android 用 `versionCode` 判断安装先后顺序，`versionName` 是用户可�
 
 ## 设备端回归
 
-主分支推送和发布标签均执行设备 smoke；日志归档为 Actions 的 `device-evidence-*`。无需新增测试依赖，设备 smoke 使用 Android 平台 Instrumentation，覆盖真实 Activity 与触摸事件分发、双指转单指、长笔记上下导航、连续 20 次勾选刷新、阅读位置进入编辑及过期焦点取消。
+主分支推送和发布标签均执行设备 smoke；新主分支提交会取消过时的验证，发布标签构建则不会被新提交取消。日志归档为 Actions 的 `device-evidence-*`。无需新增测试依赖，设备 smoke 使用 Android 平台 Instrumentation，覆盖真实 Activity 与触摸事件分发、双指转单指、长笔记上下导航、连续 20 次勾选刷新、阅读位置进入编辑及过期焦点取消。
 
 **只在模拟器或专用测试设备上执行**（会在应用私有笔记库创建测试笔记）：
 

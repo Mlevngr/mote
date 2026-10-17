@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
@@ -76,14 +76,33 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-35;google_apis;x86_64'
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n mote-ci \
             -k 'system-images;android-35;google_apis;x86_64' --device pixel_6
-          "$ANDROID_HOME/emulator/emulator" -avd mote-ci -no-window -no-audio -no-snapshot \
-            -no-boot-anim -gpu swiftshader -memory 2048 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+          nohup "$ANDROID_HOME/emulator/emulator" -avd mote-ci -no-window -no-audio -no-snapshot \
+            -no-boot-anim -accel on -gpu swiftshader -memory 2048 \
+            < /dev/null > "$RUNNER_TEMP/emulator.log" 2>&1 &
 
       - name: Device gesture and viewport smoke tests
         env:
           ANDROID_SERIAL: emulator-5554
           SMOKE_LOG: ${{ runner.temp }}/editor-smoke.log
         run: scripts/device-smoke.sh --skip-build
+
+      - name: Annotate device failures
+        if: failure()
+        shell: bash
+        run: |
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 logcat -d -b crash \
+            > "$RUNNER_TEMP/device-crash.log" 2>&1 || true
+          python3 - <<'PYTHON'
+          import os
+          from pathlib import Path
+          for name in ['emulator.log', 'editor-smoke.log', 'device-crash.log']:
+              path = Path(os.environ['RUNNER_TEMP']) / name
+              if path.exists():
+                  message = '\n'.join(path.read_text(errors='replace').splitlines()[-60:])
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error title={name}::{message}')
+          PYTHON
 
       - name: Archive device evidence
         if: always()
@@ -93,6 +112,7 @@ jobs:
           path: |
             ${{ runner.temp }}/editor-smoke.log
             ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/device-crash.log
             app/build/reports/tests/
           if-no-files-found: warn
 

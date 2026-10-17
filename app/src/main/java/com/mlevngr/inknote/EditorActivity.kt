@@ -561,7 +561,11 @@ class EditorActivity : AppCompatActivity() {
         updateMarkdownToolbar()
         updateHistoryButtons()
         refreshRows()
+        val generation = viewportGeneration
         titleInput.post {
+            if (isDestroyed || generation != viewportGeneration ||
+                mode != EditorMode.Edit || activeLine != null
+            ) return@post
             titleInput.requestFocus()
             val titleLength = titleInput.text?.length ?: 0
             titleInput.setSelection((cursorPosition ?: titleLength).coerceIn(0, titleLength))
