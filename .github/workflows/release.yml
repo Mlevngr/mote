@@ -62,7 +62,18 @@ jobs:
           esac
 
       - name: Test, lint and build app plus plugin APKs
-        run: ./gradlew testDebugUnitTest lintDebug assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew --build-cache testDebugUnitTest lintDebug assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Verify and package release assets
+        shell: bash
+        run: |
+          tag="v${{ steps.version.outputs.name }}"
+          if [[ "$GITHUB_REF" == refs/heads/* ]]; then
+            # A temporary local tag exercises packaging before a public tag is created.
+            # Never move an existing local or remote release tag.
+            git tag "$tag"
+          fi
+          python3 scripts/release.py package --tag "$tag"
 
       - name: Start disposable API 35 emulator
         env:
@@ -122,17 +133,6 @@ jobs:
             ${{ runner.temp }}/device-crash.log
             app/build/reports/tests/
           if-no-files-found: warn
-
-      - name: Verify and package release assets
-        shell: bash
-        run: |
-          tag="v${{ steps.version.outputs.name }}"
-          if [[ "$GITHUB_REF" == refs/heads/* ]]; then
-            # A temporary local tag exercises packaging before a public tag is created.
-            # Never move an existing local or remote release tag.
-            git tag "$tag"
-          fi
-          python3 scripts/release.py package --tag "$tag"
 
       - name: Archive verified assets
         if: startsWith(github.ref, 'refs/tags/')

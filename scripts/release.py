@@ -98,7 +98,7 @@ def package(output, name, code, tag):
         signature = run(str(tools / "apksigner"), "verify", "--print-certs", str(apk))
         digests = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-f]+)", signature)
         if digests != [expected_signer]:
-            raise ValueError(f"Signing certificate changed for {module}; existing installations cannot update")
+            raise ValueError(f"Signing certificate check failed for {module} using {tools}; expected {expected_signer}, parsed {digests}. Tool output:\n{signature}")
         staged.append((apk, filename))
     output.mkdir(parents=True, exist_ok=True)
     # Fail rather than leaving stale APKs from a previous run available to the upload glob.
