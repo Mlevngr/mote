@@ -247,9 +247,8 @@ class EditorActivity : AppCompatActivity() {
             val revision = renderRevision.get()
             change()
             if (anchor != null && !isDestroyed) {
-                (recyclerView.layoutManager as NoteLayoutManager).keepViewport(
-                    noteAdapter.positionOfAnchor(anchor), anchor.offset
-                ) { generation == viewportGeneration && revision == renderRevision.get() }
+                val (position, offset) = noteAdapter.resolveViewportAnchor(anchor)
+                (recyclerView.layoutManager as NoteLayoutManager).keepViewport(position, offset) { generation == viewportGeneration && revision == renderRevision.get() }
             }
         }
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
@@ -1110,9 +1109,8 @@ class EditorActivity : AppCompatActivity() {
                     displayedLines = lines
                     if (!navigate && mappedAnchor != null) {
                         val restoreGeneration = viewportGeneration
-                        manager.keepViewport(
-                            noteAdapter.positionOfAnchor(mappedAnchor), mappedAnchor.offset
-                        ) { restoreGeneration == viewportGeneration && revision == renderRevision.get() }
+                        val (position, offset) = noteAdapter.resolveViewportAnchor(mappedAnchor)
+                        manager.keepViewport(position, offset) { restoreGeneration == viewportGeneration && revision == renderRevision.get() }
                     }
                     if (navigate) ensureActiveEditorVisible(allowLocate = true)
                 }

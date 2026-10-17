@@ -188,11 +188,8 @@ class HybridNoteAdapter(
         return NoteViewportAnchor(row.lineIndex, ordinal, offset)
     }
 
-    fun positionOfAnchor(anchor: NoteViewportAnchor): Int {
-        val candidates = rows.indices.filter { rows[it].lineIndex == anchor.line }
-        if (candidates.isNotEmpty()) return candidates[anchor.ordinal.coerceIn(0, candidates.lastIndex)]
-        return rows.indices.minByOrNull { kotlin.math.abs(rows[it].lineIndex - anchor.line) } ?: 0
-    }
+    fun resolveViewportAnchor(anchor: NoteViewportAnchor): Pair<Int, Int> =
+        anchor.resolveIn(rows.map { it.lineIndex })
 
     fun editActiveLine(
         lineIndex: Int,

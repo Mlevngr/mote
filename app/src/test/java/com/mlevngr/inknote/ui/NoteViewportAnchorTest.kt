@@ -32,6 +32,20 @@ class NoteViewportAnchorTest {
             listOf("head", "- [x] task", "tail"), 1))
     }
 
+    @Test fun interleavedPdfNotesDoNotConfusePageOrdinal() {
+        val rows = listOf(10, 11, 10, 12, 10, 20)
+        assertEquals(4 to -100, NoteViewportAnchor(10, 2, -100).resolveIn(rows))
+    }
+
+    @Test fun collapsedPdfFallsBackToVisibleHeaderNotAnOffscreenOffset() {
+        assertEquals(0 to 0, NoteViewportAnchor(10, 2, -900).resolveIn(listOf(10, 20)))
+    }
+
+    @Test fun removedAnchorUsesNearestRowWithAVisibleOffset() {
+        assertEquals(1 to 0, NoteViewportAnchor(9, 0, -100).resolveIn(listOf(2, 10, 11)))
+        assertEquals(0 to 0, NoteViewportAnchor(9, 0, -100).resolveIn(emptyList()))
+    }
+
     @Test fun unchangedDocumentAndEmptyDocumentAreSafe() {
         val lines = listOf("a", "b", "c")
         assertEquals(2, NoteViewportAnchor.mapLine(lines, lines, 2))

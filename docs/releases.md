@@ -32,7 +32,7 @@ Android 用 `versionCode` 判断安装先后顺序，`versionName` 是用户可�
    python3 scripts/release.py check --tag v0.8.1 --previous-tag v0.8.0-r25
    ./gradlew testDebugUnitTest lintDebug assembleRelease
    ```
-3. 提交后创建对应标签并推送主分支和该标签。CI 获取完整历史，对照所有其他版本标签验证版本递增、拒绝覆盖已有 Release、检查 tag 匹配、发布说明存在，运行所有模块的测试/lint，构建正式 APK。
+3. 提交并推送主分支；CI 先在带 KVM 的 API 35 模拟器执行设备 smoke。主分支校验通过后再创建并推送对应标签；标签构建重复同样的检查，通过后才发布。CI 获取完整历史，对照所有其他版本标签验证版本递增、拒绝覆盖已有 Release、检查 tag 匹配、发布说明存在，运行所有模块的测试/lint，构建正式 APK。
 4. 仅从干净、已提交且对应标签指向 HEAD 的检出目录运行 `python3 scripts/release.py package --tag v0.8.1`。它校验 APK 清单/构建元数据、包名、versionName/code 和签名，并输出到**必须为空**的 `build/release/`。本地重复打包请使用 `--output build/release-<unique-name>`，不覆盖旧输出。
 5. 产物统一为 `Mote.apk`、两个 `Mote-*-Organizer.apk`、`SHA256SUMS`、`release.json`。主程序为单一通用 APK；不混入 debug/unsigned 或 ABI 分包。
 6. CI 全部成功后创建正式 GitHub Release（含 `-beta.N`/`-rc.N` 的标签才为 prerelease）。检查 Release 可见、下载 APK 的元数据、SHA-256 和签名。下载后可用 `sha256sum -c SHA256SUMS` 校验全部 APK。
@@ -53,15 +53,13 @@ Android 用 `versionCode` 判断安装先后顺序，`versionName` 是用户可�
 
 ## 设备端回归
 
-无需新增测试依赖，设备 smoke 使用 Android 平台 Instrumentation，覆盖真实 Activity 与触摸事件分发、双指转单指、长笔记上下导航、连续 20 次勾选刷新、阅读位置进入编辑及过期焦点取消。
+主分支推送和发布标签均执行设备 smoke；日志归档为 Actions 的 `device-evidence-*`。无需新增测试依赖，设备 smoke 使用 Android 平台 Instrumentation，覆盖真实 Activity 与触摸事件分发、双指转单指、长笔记上下导航、连续 20 次勾选刷新、阅读位置进入编辑及过期焦点取消。
 
 **只在模拟器或专用测试设备上执行**（会在应用私有笔记库创建测试笔记）：
 
 ```sh
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w com.mlevngr.inknote.test/com.mlevngr.inknote.EditorSmokeInstrumentation
+ANDROID_SERIAL=emulator-5554 scripts/device-smoke.sh --skip-build
 ```
 
 这是无 AndroidX runner 依赖的专用 smoke runner，不声称替代所有 UI 测试。仍需人工检查不同输入法、长按选文与选择手柄、图片/PDF 高度变化、键盘遮挡和 4/6 倍操作；纯数学单元测试不能作为设备体验通过的证据。

@@ -1,7 +1,9 @@
-name: Build Android release
+name: Validate Android and publish releases
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -37,11 +39,15 @@ jobs:
         shell: bash
         run: |
           python3 -m unittest discover -s scripts/tests -v
-          python3 scripts/release.py check --tag "$GITHUB_REF_NAME" --history
-          test -f "docs/releases/${GITHUB_REF_NAME#v}.md"
-          echo "name=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          version=$(sed -n 's/^versionName=//p' version.properties)
+          tag="v$version"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tag="$GITHUB_REF_NAME"; fi
+          python3 scripts/release.py check --tag "$tag" --history
+          test -f "docs/releases/$version.md"
+          echo "name=$version" >> "$GITHUB_OUTPUT"
 
       - name: Refuse to overwrite an existing release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -56,12 +62,46 @@ jobs:
           esac
 
       - name: Test, lint and build app plus plugin APKs
-        run: ./gradlew testDebugUnitTest lintDebug assembleRelease
+        run: ./gradlew testDebugUnitTest lintDebug assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Start disposable API 35 emulator
+        shell: bash
+        run: |
+          test -e /dev/kvm
+          sudo chgrp "$(id -gn)" /dev/kvm
+          sudo chmod g+rw /dev/kvm
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-35;google_apis;x86_64'
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n mote-ci \
+            -k 'system-images;android-35;google_apis;x86_64' --device pixel_6
+          "$ANDROID_HOME/emulator/emulator" -avd mote-ci -no-window -no-audio -no-snapshot \
+            -no-boot-anim -gpu swiftshader -memory 2048 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+
+      - name: Device gesture and viewport smoke tests
+        env:
+          ANDROID_SERIAL: emulator-5554
+          SMOKE_LOG: ${{ runner.temp }}/editor-smoke.log
+        run: scripts/device-smoke.sh --skip-build
+
+      - name: Archive device evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-evidence-${{ github.ref_name }}
+          path: |
+            ${{ runner.temp }}/editor-smoke.log
+            ${{ runner.temp }}/emulator.log
+            app/build/reports/tests/
+          if-no-files-found: warn
 
       - name: Verify and package release assets
+        if: startsWith(github.ref, 'refs/tags/')
         run: python3 scripts/release.py package --tag "$GITHUB_REF_NAME"
 
       - name: Archive verified assets
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ github.ref_name }}
@@ -69,6 +109,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
@@ -77,3 +118,8 @@ jobs:
           body_path: docs/releases/${{ steps.version.outputs.name }}.md
           files: build/release/*
           fail_on_unmatched_files: true
+
+      - name: Stop emulator
+        if: always()
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 emu kill || true
