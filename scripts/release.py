@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_ID = "com.mlevngr.inknote"
@@ -43,7 +44,7 @@ def validate(name, code, tag, previous=None):
 
 
 def run(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+    return subprocess.check_output(args, cwd=ROOT, text=True, stderr=subprocess.STDOUT).strip()
 
 
 def previous_version(tag):
@@ -65,8 +66,9 @@ def build_tools():
 
 
 def package(output, name, code, tag):
-    if run("git", "status", "--porcelain", "--untracked-files=all"):
-        raise ValueError("Package from a clean committed checkout so release.json identifies the actual source")
+    changes = run("git", "status", "--porcelain", "--untracked-files=all")
+    if changes:
+        raise ValueError(f"Package from a clean committed checkout; unexpected changes:\n{changes}")
     if run("git", "rev-parse", f"{tag}^{{commit}}") != run("git", "rev-parse", "HEAD"):
         raise ValueError("Release tag must point at the checkout being packaged")
     tools = build_tools()
@@ -136,4 +138,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        detail = str(error)
+        if isinstance(error, subprocess.CalledProcessError):
+            detail += "\n" + (error.output or "")
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            escaped = detail.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+            print(f"::error title=Release verification::{escaped}")
+        print(detail, file=sys.stderr)
+        sys.exit(1)

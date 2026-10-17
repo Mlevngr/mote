@@ -4,7 +4,7 @@
 
 1. 在 Obtainium 添加应用，来源填 `https://github.com/Mlevngr/mote`。
 2. 在 GitHub 来源的额外选项中，将 **Filter APKs by Regular Expression / 按正则表达式过滤 APK** 设为 **`^Mote\.apk$`**。
-3. 使用正式发布（不启用预发布）；不使用“发布日期作为版本”，也不需要禁用版本检测。正式标签 `v0.8.1` 对应 APK 内 `0.8.1`。
+3. 使用正式发布（不启用预发布）；不使用“发布日期作为版本”，也不需要禁用版本检测。正式标签 `v0.8.2` 对应 APK 内 `0.8.2`。
 4. 添加后可由 Obtainium 下载、安装和检查更新。Android 仍可能要求授予安装未知应用权限或确认安装，不保证无人值守安装。
 
 固定下载入口：[最新正式版 Mote.apk](https://github.com/Mlevngr/mote/releases/latest/download/Mote.apk)。
@@ -15,9 +15,9 @@
 ## 版本规则
 
 - `version.properties` 是主程序 `versionName` / `versionCode` 的唯一来源。
-- 正式版使用 SemVer `主.次.修订`：此次 `0.8.1`；修复发布递增修订号，新增兼容功能递增次版本，重大不兼容变更递增主版本。
+- 正式版使用 SemVer `主.次.修订`：此次 `0.8.2`；修复发布递增修订号，新增兼容功能递增次版本，重大不兼容变更递增主版本。
 - 预发布使用 `0.9.0-beta.1` 或 `0.9.0-rc.1`；正式标签必须严格等于 `v${versionName}`。不再使用 APK 内版本不变而只给标签增加 `-rN` 的方式。
-- 每一次公开发布（包括预发布）都必须提高 `versionCode`，此次从 56 提高到 57。它独立于 SemVer，不根据提交数、时间或 CI 重跑自动生成。
+- 每一次公开发布（包括预发布）都必须提高 `versionCode`，此次从 56 提高到 58。它独立于 SemVer，不根据提交数、时间或 CI 重跑自动生成。
 - 不覆盖已发布标签或替换同版本 APK。修复构建需要新版本、新 code、新标签；失败且未发布的 CI 可用同标签重跑。
 - 插件保持各自独立的版本；只有插件代码变化时才在其 Gradle 配置中递增，不把主程序版本当插件版本。
 
@@ -29,11 +29,11 @@ Android 用 `versionCode` 判断安装先后顺序，`versionName` 是用户可�
 2. 运行版本校验（从旧式 r25 迁移也支持）：
    ```sh
    python3 -m unittest discover -s scripts/tests -v
-   python3 scripts/release.py check --tag v0.8.1 --previous-tag v0.8.0-r25
+   python3 scripts/release.py check --tag v0.8.2 --previous-tag v0.8.0-r25
    ./gradlew testDebugUnitTest lintDebug assembleRelease
    ```
 3. 提交并推送主分支；CI 先在带 KVM 的 API 35 模拟器执行设备 smoke。主分支校验通过后再创建并推送对应标签；标签构建重复同样的检查，通过后才发布。CI 获取完整历史，对照所有其他版本标签验证版本递增、拒绝覆盖已有 Release、检查 tag 匹配、发布说明存在，运行所有模块的测试/lint，构建正式 APK。
-4. 仅从干净、已提交且对应标签指向 HEAD 的检出目录运行 `python3 scripts/release.py package --tag v0.8.1`。它校验 APK 清单/构建元数据、包名、versionName/code 和签名，并输出到**必须为空**的 `build/release/`。本地重复打包请使用 `--output build/release-<unique-name>`，不覆盖旧输出。
+4. 仅从干净、已提交且对应标签指向 HEAD 的检出目录运行 `python3 scripts/release.py package --tag v0.8.2`。它校验 APK 清单/构建元数据、包名、versionName/code 和签名，并输出到**必须为空**的 `build/release/`。本地重复打包请使用 `--output build/release-<unique-name>`，不覆盖旧输出。
 5. 产物统一为 `Mote.apk`、两个 `Mote-*-Organizer.apk`、`SHA256SUMS`、`release.json`。主程序为单一通用 APK；不混入 debug/unsigned 或 ABI 分包。
 6. CI 全部成功后创建正式 GitHub Release（含 `-beta.N`/`-rc.N` 的标签才为 prerelease）。检查 Release 可见、下载 APK 的元数据、SHA-256 和签名。下载后可用 `sha256sum -c SHA256SUMS` 校验全部 APK。
 
