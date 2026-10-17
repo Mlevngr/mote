@@ -82,6 +82,9 @@ class HybridNoteAdapter(
     private val collapsedAssets = mutableSetOf<AssetInstanceKey>()
     private val collapsedPdfPages = mutableSetOf<PdfPreviewVisibility.PageKey>()
     private var assetPastePending = false
+    var onPreviewLayoutChange: (userInitiated: Boolean, change: () -> Unit) -> Unit = { _, change -> change() }
+    private var focusGeneration = 0
+    private var showKeyboardOnFocus = true
     private var focusLine: Int? = null
     private var focusCursor: Int? = null
     private var focusSelectionStart: Int? = null
@@ -100,8 +103,11 @@ class HybridNoteAdapter(
         editing: Boolean,
         focusLine: Int? = null,
         focusCursor: Int? = null,
-        focusSelectionStart: Int? = null
+        focusSelectionStart: Int? = null,
+        showKeyboard: Boolean = true
     ) {
+        focusGeneration++
+        showKeyboardOnFocus = showKeyboard
         migratePdfCollapseKeys(allRows, newRows)
         allRows = newRows
         val availableAssets = newRows.mapNotNull(AssetPreviewVisibility::assetKey).toSet()
@@ -151,8 +157,10 @@ class HybridNoteAdapter(
 
     fun setAssetPastePending(pending: Boolean) {
         if (assetPastePending == pending) return
-        assetPastePending = pending
-        notifyDataSetChanged()
+        onPreviewLayoutChange(true) {
+            assetPastePending = pending
+            notifyDataSetChanged()
+        }
     }
 
     fun setCanvasScale(scale: Float) {
@@ -163,6 +171,28 @@ class HybridNoteAdapter(
     }
 
     fun positionOfLine(lineIndex: Int): Int = rows.indexOfFirst { it.lineIndex == lineIndex }
+
+    fun cancelPendingFocus() {
+        focusGeneration++
+        focusLine = null
+        focusCursor = null
+        focusSelectionStart = null
+    }
+
+    fun focusedEditState(lineIndex: Int): MarkdownEditResult? =
+        activeEditState(lineIndex).takeIf { activeEditor?.hasFocus() == true }
+
+    fun viewportAnchor(position: Int, offset: Int): NoteViewportAnchor? {
+        val row = rows.getOrNull(position) ?: return null
+        val ordinal = rows.take(position).count { it.lineIndex == row.lineIndex }
+        return NoteViewportAnchor(row.lineIndex, ordinal, offset)
+    }
+
+    fun positionOfAnchor(anchor: NoteViewportAnchor): Int {
+        val candidates = rows.indices.filter { rows[it].lineIndex == anchor.line }
+        if (candidates.isNotEmpty()) return candidates[anchor.ordinal.coerceIn(0, candidates.lastIndex)]
+        return rows.indices.minByOrNull { kotlin.math.abs(rows[it].lineIndex - anchor.line) } ?: 0
+    }
 
     fun editActiveLine(
         lineIndex: Int,
@@ -561,18 +591,26 @@ class HybridNoteAdapter(
         )
         if (focusLine == row.lineIndex) {
             focusLine = null
+            val generation = focusGeneration
+            val showKeyboard = showKeyboardOnFocus
             val cursor = focusCursor
             val selectionStart = focusSelectionStart
             focusCursor = null
             focusSelectionStart = null
             holder.editor.post {
+                if (generation != focusGeneration || !editing ||
+                    activeEditor !== holder.editor || activeEditorLine != row.lineIndex ||
+                    !holder.editor.isAttachedToWindow
+                ) return@post
                 holder.editor.requestFocus()
                 val end = (cursor ?: holder.editor.text?.length ?: 0)
                     .coerceIn(0, holder.editor.text?.length ?: 0)
                 val start = (selectionStart ?: end).coerceIn(0, end)
                 holder.editor.setSelection(start, end)
-                context.getSystemService<InputMethodManager>()
-                    ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
+                if (showKeyboard) {
+                    context.getSystemService<InputMethodManager>()
+                        ?.showSoftInput(holder.editor, InputMethodManager.SHOW_IMPLICIT)
+                }
             }
         }
         pendingEdit?.takeIf { it.lineIndex == row.lineIndex }?.let { pending ->
@@ -730,21 +768,27 @@ class HybridNoteAdapter(
         assetKey(lineIndex, file) in collapsedAssets
 
     private fun toggleAsset(lineIndex: Int, file: File) {
-        val key = assetKey(lineIndex, file)
-        if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
-        rebuildVisibleRows()
-        notifyDataSetChanged()
+        onPreviewLayoutChange(true) {
+            val key = assetKey(lineIndex, file)
+            if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
+            rebuildVisibleRows()
+            notifyDataSetChanged()
+        }
     }
 
     private fun togglePdfDocument(key: AssetInstanceKey) {
-        if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
-        rebuildVisibleRows()
-        notifyDataSetChanged()
+        onPreviewLayoutChange(true) {
+            if (!collapsedAssets.add(key)) collapsedAssets.remove(key)
+            rebuildVisibleRows()
+            notifyDataSetChanged()
+        }
     }
 
     private fun togglePdfPage(key: PdfPreviewVisibility.PageKey) {
-        if (!collapsedPdfPages.add(key)) collapsedPdfPages.remove(key)
-        notifyDataSetChanged()
+        onPreviewLayoutChange(true) {
+            if (!collapsedPdfPages.add(key)) collapsedPdfPages.remove(key)
+            notifyDataSetChanged()
+        }
     }
 
     private fun rebuildVisibleRows() {
@@ -752,16 +796,22 @@ class HybridNoteAdapter(
     }
 
     private fun loadBitmap(holder: AssetHolder, key: String, loader: () -> Bitmap) {
+        val sameSource = (holder.image.tag as? String)?.substringBeforeLast(':') == key.substringBeforeLast(':')
         holder.image.tag = key
         bitmapCache.get(key)?.let {
             holder.image.setImageBitmap(it)
             return
         }
-        holder.image.setImageDrawable(null)
+        // A higher-resolution render of the SAME source must not collapse the row while loading.
+        if (!sameSource) holder.image.setImageDrawable(null)
         worker.execute {
             val bitmap = runCatching(loader).getOrNull() ?: return@execute
             bitmapCache.put(key, bitmap)
-            main.post { if (holder.image.tag == key) holder.image.setImageBitmap(bitmap) }
+            main.post {
+                if (holder.image.tag == key) {
+                    onPreviewLayoutChange(false) { holder.image.setImageBitmap(bitmap) }
+                }
+            }
         }
     }
 

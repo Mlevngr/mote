@@ -1,6 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
 }
+
+val appVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val releaseVersionName = requireNotNull(appVersion.getProperty("versionName"))
+val releaseVersionCode = requireNotNull(appVersion.getProperty("versionCode")).toInt()
+require(releaseVersionCode in 1..2100000000)
+require(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-(?:alpha|beta|rc)\\.[0-9]+)?").matches(releaseVersionName))
 
 android {
     namespace = "com.mlevngr.inknote"
@@ -10,9 +20,9 @@ android {
         applicationId = "com.mlevngr.inknote"
         minSdk = 28
         targetSdk = 36
-        versionCode = 56
-        versionName = "0.8.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
+        testInstrumentationRunner = "com.mlevngr.inknote.EditorSmokeInstrumentation"
     }
 
     signingConfigs {

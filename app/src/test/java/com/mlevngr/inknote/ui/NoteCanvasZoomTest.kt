@@ -52,6 +52,41 @@ class NoteCanvasZoomTest {
         assertEquals(6f, NoteCanvasZoom.previewRenderScale(5.5f), 0.001f)
     }
 
+    @Test fun singleFingerPanUsesScreenPixelsWithoutChangingScale() {
+        for (scale in listOf(2f, 4f, 6f)) {
+            val current = NoteCanvasZoom.Transform(scale, -300f, -300f)
+            val pan = NoteCanvasZoom.pan(current, 100f, 80f, 1000f, 800f)
+            assertEquals(scale, pan.transform.scale, 0f)
+            assertEquals(-200f, pan.transform.translationX, 0.001f)
+            assertEquals(-220f, pan.transform.translationY, 0.001f)
+            assertEquals(0f, pan.remainingY, 0.001f)
+        }
+    }
+
+    @Test fun verticalOverflowIsPassedToTheListInContentCoordinates() {
+        val current = NoteCanvasZoom.Transform(2f, -500f, -750f)
+        val pan = NoteCanvasZoom.pan(current, -1000f, -150f, 1000f, 800f)
+        assertEquals(-1000f, pan.transform.translationX, 0.001f)
+        assertEquals(-800f, pan.transform.translationY, 0.001f)
+        assertEquals(-100f, pan.remainingY, 0.001f)
+        assertEquals(50f, pan.scrollY, 0.001f)
+    }
+
+    @Test fun panningBackAtTheTopHandsRemainderToTheList() {
+        val pan = NoteCanvasZoom.pan(
+            NoteCanvasZoom.Transform(4f, -10f, -10f), 100f, 50f, 1000f, 800f
+        )
+        assertEquals(0f, pan.transform.translationX, 0.001f)
+        assertEquals(0f, pan.transform.translationY, 0.001f)
+        assertEquals(-10f, pan.scrollY, 0.001f)
+    }
+
+    @Test fun fitWidthDoesNotAcquireExtraCanvasTranslation() {
+        val pan = NoteCanvasZoom.pan(NoteCanvasZoom.Transform(), 100f, -100f, 1000f, 800f)
+        assertEquals(NoteCanvasZoom.Transform(), pan.transform)
+        assertEquals(100f, pan.scrollY, 0.001f)
+    }
+
     private fun update(
         current: NoteCanvasZoom.Transform,
         factor: Float,

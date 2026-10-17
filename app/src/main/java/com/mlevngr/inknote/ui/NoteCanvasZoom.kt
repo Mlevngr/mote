@@ -33,6 +33,29 @@ object NoteCanvasZoom {
         )
     }
 
+    data class Pan(val transform: Transform, val remainingY: Float) {
+        // The canvas uses screen pixels; RecyclerView uses unscaled content pixels.
+        val scrollY: Float get() = -remainingY / transform.scale
+    }
+
+    fun pan(
+        current: Transform,
+        deltaX: Float,
+        deltaY: Float,
+        viewportWidth: Float,
+        viewportHeight: Float
+    ): Pan {
+        val next = constrain(
+            current.copy(
+                translationX = current.translationX + deltaX,
+                translationY = current.translationY + deltaY
+            ),
+            viewportWidth,
+            viewportHeight
+        )
+        return Pan(next, deltaY - (next.translationY - current.translationY))
+    }
+
     fun settle(
         transform: Transform,
         viewportWidth: Float,

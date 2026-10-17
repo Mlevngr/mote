@@ -4,13 +4,13 @@
 
 ## 下载 APK
 
-**[直接下载 Mote 0.8.0 APK（内部构建号 53）](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r22/Mote-0.8.0-r22.apk?download=1)**
+**[下载最新正式版 Mote.apk](https://github.com/Mlevngr/mote/releases/latest/download/Mote.apk)**
 
-**[可选：下载 Mote AI Organizer 插件 APK](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r22/Mote-AI-Organizer-1.0.0.apk?download=1)**
+[可选：AI Organizer 插件](https://github.com/Mlevngr/mote/releases/latest/download/Mote-AI-Organizer.apk) · [可选：完全离线的本地整理插件](https://github.com/Mlevngr/mote/releases/latest/download/Mote-Local-Organizer.apk)
 
-**[可选：下载完全离线的 Mote 本地整理插件](https://github.com/Mlevngr/mote/releases/download/v0.8.0-r22/Mote-Local-Organizer-1.0.0.apk?download=1)**
+也可进入 [GitHub Releases](https://github.com/Mlevngr/mote/releases) 选择版本。
 
-也可以进入 [GitHub Releases](https://github.com/Mlevngr/mote/releases) 选择最新版本。APK 使用固定测试签名，适合当前测试阶段直接安装和覆盖更新。
+**Obtainium**：添加 `https://github.com/Mlevngr/mote`，APK 过滤设置为 `^Mote\.apk$`，使用正式发布即可。版本号、校验和、签名限制和完整流程见 [发布与更新说明](docs/releases.md)。APK 保留固定测试签名以支持覆盖安装；公开测试密钥不具备生产私钥的安全性。
 
 > 0.4.0 首次切换到固定签名，因此从 0.3.1 升级时需要最后卸载一次旧版。安装
 > 0.4.0 后，后续 GitHub Release 可以直接覆盖更新。固定签名仅用于当前开源测试分发，

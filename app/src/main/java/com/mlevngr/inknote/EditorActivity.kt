@@ -25,7 +25,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
@@ -47,6 +46,8 @@ import com.mlevngr.inknote.ui.HybridNoteAdapter
 import com.mlevngr.inknote.ui.HybridRowFactory
 import com.mlevngr.inknote.ui.ImeBackTextInputEditText
 import com.mlevngr.inknote.ui.NoteCanvasZoomLayout
+import com.mlevngr.inknote.ui.NoteViewportAnchor
+import com.mlevngr.inknote.ui.NoteLayoutManager
 import com.mlevngr.inknote.ui.PreviewRowFactory
 import com.mlevngr.inknote.ui.SystemBarInsets
 import com.mlevngr.inknote.plugins.DiscoveredPlugin
@@ -88,6 +89,9 @@ class EditorActivity : AppCompatActivity() {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val renderRevision = AtomicInteger()
+    private var viewportGeneration = 0
+    private var followActiveEditor = false
+    private var displayedLines: List<String> = emptyList()
     private var mode = EditorMode.Read
     private var activeLine: Int? = null
     private var lastActiveLine = 0
@@ -221,9 +225,32 @@ class EditorActivity : AppCompatActivity() {
             }
         }
         recyclerView = findViewById<RecyclerView>(R.id.note_content).apply {
-            layoutManager = LinearLayoutManager(this@EditorActivity)
+            layoutManager = NoteLayoutManager(this@EditorActivity)
             adapter = noteAdapter
             itemAnimator = null
+            // Focus is restored explicitly with a generation check, not by stale adapter positions.
+            preserveFocusAfterLayout = false
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(view: RecyclerView, newState: Int) {
+                    if (newState == RecyclerView.SCROLL_STATE_DRAGGING) onUserNavigation()
+                }
+            })
+        }
+        findViewById<NoteCanvasZoomLayout>(R.id.note_canvas).apply {
+            onUserNavigation = ::onUserNavigation
+            onScrollContent = { pixels -> recyclerView.scrollBy(0, pixels) }
+        }
+        noteAdapter.onPreviewLayoutChange = { userInitiated, change ->
+            if (userInitiated) onUserNavigation()
+            val anchor = currentViewportAnchor()
+            val generation = viewportGeneration
+            val revision = renderRevision.get()
+            change()
+            if (anchor != null && !isDestroyed) {
+                (recyclerView.layoutManager as NoteLayoutManager).keepViewport(
+                    noteAdapter.positionOfAnchor(anchor), anchor.offset
+                ) { generation == viewportGeneration && revision == renderRevision.get() }
+            }
         }
         modeButton = findViewById<AppCompatImageButton>(R.id.toggle_mode).also {
             it.setOnClickListener { toggleMode() }
@@ -509,7 +536,8 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun enterEditMode() {
-        enterEditModeAt(lastActiveLine)
+        // A toolbar mode switch edits the area being read, not a stale line near the note's start.
+        enterEditModeAt(currentViewportAnchor()?.line ?: lastActiveLine)
     }
 
     private fun enterEditModeAt(lineIndex: Int) {
@@ -525,6 +553,7 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun enterTitleEditMode(cursorPosition: Int? = null) {
+        onUserNavigation()
         mode = EditorMode.Edit
         activeLine = null
         history.breakGroup()
@@ -543,6 +572,7 @@ class EditorActivity : AppCompatActivity() {
     }
 
     private fun enterReadMode() {
+        onUserNavigation()
         mode = EditorMode.Read
         activeLine?.let { lastActiveLine = it }
         activeLine = null
@@ -830,11 +860,8 @@ class EditorActivity : AppCompatActivity() {
         val cursor = editorState?.selectionEnd ?: 0
         val selectionStart = editorState?.selectionStart ?: cursor
         recordHistory(MarkdownHistoryKind.Structural, historyLine, cursor, selectionStart)
-        refreshRows(
-            requestFocus = mode == EditorMode.Edit && historyLine != null,
-            cursorPosition = cursor,
-            selectionStart = selectionStart
-        )
+        // Checking a task is not a request to navigate back to the old editor.
+        refreshRows()
         scheduleSave()
     }
 
@@ -846,6 +873,7 @@ class EditorActivity : AppCompatActivity() {
         selectionEnd: Int
     ) {
         if (index !in 0 until document.size) return
+        followActiveEditor = true
         val update = document.updateWithOrderedListReconciliation(
             index,
             source,
@@ -961,8 +989,10 @@ class EditorActivity : AppCompatActivity() {
         )
         cleanupRemovedImages(result.removedImages)
         updateMarkdownToolbar()
-        if (patched) scheduleDeleteRefresh(result.cursor)
-        else refreshRows(requestFocus = true, cursorPosition = result.cursor)
+        if (patched) {
+            displayedLines = document.snapshot()
+            scheduleDeleteRefresh(result.cursor)
+        } else refreshRows(requestFocus = true, cursorPosition = result.cursor)
         scheduleSave()
         return true
     }
@@ -986,8 +1016,10 @@ class EditorActivity : AppCompatActivity() {
         )
         cleanupRemovedImages(result.removedImages)
         updateMarkdownToolbar()
-        if (patched) scheduleDeleteRefresh(result.cursor)
-        else refreshRows(requestFocus = true, cursorPosition = result.cursor)
+        if (patched) {
+            displayedLines = document.snapshot()
+            scheduleDeleteRefresh(result.cursor)
+        } else refreshRows(requestFocus = true, cursorPosition = result.cursor)
         scheduleSave()
         return true
     }
@@ -1019,6 +1051,24 @@ class EditorActivity : AppCompatActivity() {
         scheduleSave()
     }
 
+    private fun currentViewportAnchor(): NoteViewportAnchor? {
+        val visibleTop = findViewById<NoteCanvasZoomLayout>(R.id.note_canvas)
+            .visibleTopIn(recyclerView).coerceAtLeast(recyclerView.paddingTop.toFloat())
+        val child = (0 until recyclerView.childCount).asSequence()
+            .map(recyclerView::getChildAt)
+            .firstOrNull { it.bottom > visibleTop } ?: return null
+        return noteAdapter.viewportAnchor(
+            recyclerView.getChildAdapterPosition(child), child.top - recyclerView.paddingTop
+        )
+    }
+
+    private fun onUserNavigation() {
+        viewportGeneration++
+        followActiveEditor = false
+        noteAdapter.cancelPendingFocus()
+        (recyclerView.layoutManager as NoteLayoutManager).cancelViewportRestore()
+    }
+
     private fun refreshRows(
         requestFocus: Boolean = false,
         cursorPosition: Int? = null,
@@ -1026,6 +1076,12 @@ class EditorActivity : AppCompatActivity() {
     ) {
         deleteRefreshTask?.let(main::removeCallbacks)
         deleteRefreshTask = null
+        noteAdapter.cancelPendingFocus()
+        if (requestFocus) {
+            viewportGeneration++
+            followActiveEditor = true
+        }
+        val navigation = viewportGeneration
         val revision = renderRevision.incrementAndGet()
         val lines = document.snapshot()
         val active = activeLine
@@ -1034,14 +1090,31 @@ class EditorActivity : AppCompatActivity() {
             val rows = rowFactory.create(lines, active)
             main.post {
                 if (!isDestroyed && revision == renderRevision.get()) {
+                    val manager = recyclerView.layoutManager as NoteLayoutManager
+                    // Capture immediately before applying: the user may have scrolled during rendering.
+                    val anchor = currentViewportAnchor()
+                    val mappedAnchor = anchor?.copy(
+                        line = NoteViewportAnchor.mapLine(displayedLines, lines, anchor.line)
+                    )
+                    val navigate = requestFocus && navigation == viewportGeneration
+                    val retainedState = active?.takeIf { editing && followActiveEditor }
+                        ?.let(noteAdapter::focusedEditState)
                     noteAdapter.submit(
                         rows,
                         editing,
-                        active.takeIf { requestFocus },
-                        cursorPosition,
-                        selectionStart
+                        active.takeIf { navigate || retainedState != null },
+                        if (navigate) cursorPosition else retainedState?.selectionEnd,
+                        if (navigate) selectionStart else retainedState?.selectionStart,
+                        showKeyboard = navigate
                     )
-                    if (editing) ensureActiveEditorVisible()
+                    displayedLines = lines
+                    if (!navigate && mappedAnchor != null) {
+                        val restoreGeneration = viewportGeneration
+                        manager.keepViewport(
+                            noteAdapter.positionOfAnchor(mappedAnchor), mappedAnchor.offset
+                        ) { restoreGeneration == viewportGeneration && revision == renderRevision.get() }
+                    }
+                    if (navigate) ensureActiveEditorVisible(allowLocate = true)
                 }
             }
         }
@@ -1051,29 +1124,40 @@ class EditorActivity : AppCompatActivity() {
         deleteRefreshTask?.let(main::removeCallbacks)
         deleteRefreshTask = Runnable {
             deleteRefreshTask = null
-            val line = activeLine
-            val cursor = line?.let(noteAdapter::activeEditState)?.selectionEnd ?: fallbackCursor
-            refreshRows(requestFocus = line != null, cursorPosition = cursor)
+            // Reconciliation is not a new edit/navigation intent. submit retains visible selection.
+            refreshRows(cursorPosition = fallbackCursor)
         }.also { main.postDelayed(it, DELETE_REFRESH_DEBOUNCE_MS) }
     }
 
-    private fun ensureActiveEditorVisible(retry: Boolean = true) {
+    private fun ensureActiveEditorVisible(allowLocate: Boolean = false) {
+        if (!followActiveEditor || mode != EditorMode.Edit) return
         val line = activeLine ?: return
-        val position = noteAdapter.positionOfLine(line)
-        if (position < 0) return
+        val generation = viewportGeneration
+        val revision = renderRevision.get()
         recyclerView.post {
+            if (isDestroyed || generation != viewportGeneration || revision != renderRevision.get() ||
+                activeLine != line || mode != EditorMode.Edit || !followActiveEditor
+            ) return@post
+            val position = noteAdapter.positionOfLine(line)
+            if (position < 0) return@post
             val holder = recyclerView.findViewHolderForAdapterPosition(position)
             if (holder == null) {
-                if (retry) {
+                if (allowLocate) {
                     recyclerView.scrollToPosition(position)
-                    recyclerView.post { ensureActiveEditorVisible(retry = false) }
+                    ensureActiveEditorVisible()
                 }
                 return@post
             }
-            val view = holder.itemView
-            view.requestRectangleOnScreen(
-                Rect(0, 0, view.width, view.height + dp(24)),
-                false
+            val editor = holder.itemView as? android.widget.EditText ?: return@post
+            if (!allowLocate && !editor.hasFocus()) return@post
+            val layout = editor.layout ?: return@post
+            val cursor = editor.selectionEnd.coerceIn(0, editor.length())
+            val textLine = layout.getLineForOffset(cursor)
+            val x = layout.getPrimaryHorizontal(cursor).toInt() + editor.totalPaddingLeft - editor.scrollX
+            val top = layout.getLineTop(textLine) + editor.totalPaddingTop - editor.scrollY
+            val bottom = layout.getLineBottom(textLine) + editor.totalPaddingTop - editor.scrollY
+            findViewById<NoteCanvasZoomLayout>(R.id.note_canvas).revealDescendantRect(
+                editor, Rect(x - dp(4), top - dp(4), x + dp(4), bottom + dp(8))
             )
         }
     }
