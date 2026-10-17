@@ -26,8 +26,9 @@ for setting in window_animation_scale transition_animation_scale animator_durati
 done
 "$adb" -s "$ANDROID_SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 "$adb" -s "$ANDROID_SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-# am instrument may return exit code 0 for failed tests; require the runner's explicit success markers.
-timeout 600 "$adb" -s "$ANDROID_SERIAL" shell am instrument -w \
+# Raw output preserves result fields even when the runner provides a human-readable stream.
+# am instrument may return exit code 0 for failed tests; require explicit success markers.
+timeout 600 "$adb" -s "$ANDROID_SERIAL" shell am instrument -w -r \
   com.mlevngr.inknote.test/com.mlevngr.inknote.EditorSmokeInstrumentation | tee "$log"
 grep -q '^INSTRUMENTATION_RESULT: failures=0' "$log"
 grep -q '^INSTRUMENTATION_CODE: -1' "$log"
