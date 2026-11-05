@@ -112,6 +112,13 @@ jobs:
           SMOKE_LOG: ${{ runner.temp }}/editor-smoke.log
         run: scripts/device-smoke.sh --skip-build
 
+      - name: Verify heading colors in the minified release APK
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" -s "$ANDROID_SERIAL" uninstall com.mlevngr.inknote
+          bash scripts/release-heading-smoke.sh
+
       - name: Annotate device failures
         if: failure()
         shell: bash
@@ -139,6 +146,7 @@ jobs:
             ${{ runner.temp }}/emulator.log
             ${{ runner.temp }}/device-crash.log
             app/build/reports/tests/
+            app/build/release-heading-test/result.log
           if-no-files-found: warn
 
       - name: Archive verified assets

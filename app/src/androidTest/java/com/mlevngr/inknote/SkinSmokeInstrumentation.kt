@@ -32,6 +32,7 @@ open class SkinSmokeInstrumentation : Instrumentation() {
         val tests = listOf<Pair<String, () -> Unit>>(
             "runtimePaletteAndBuiltinIsolation" to ::runtimePalette,
             "sixHeadingColorsAndThumbnail" to ::headingColors,
+            "headingsAreColoredInsideTheActualEditor" to ::editorHeadingColors,
             "documentImportExportAndInvalidInput" to ::documents,
             "editablePaletteIsApplied" to ::editPalette
         )
@@ -101,6 +102,44 @@ open class SkinSmokeInstrumentation : Instrumentation() {
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         palette.headings.forEach { check(it in pixels) { "Thumbnail is missing heading color ${SkinColor.hex(it)}" } }
         bitmap.recycle()
+    }
+
+    private fun editorHeadingColors() {
+        SkinPreferences(targetContext).apply(fixture)
+        val library = NoteLibrary(targetContext)
+        val markdown = (1..6).joinToString("\n") { "${"#".repeat(it)} Editor heading $it" }
+        val note = library.createNote(NoteLibrary.FolderLocation.Root, "Skin editor regression", markdown)
+        val editor = startActivitySync(EditorActivity.intent(targetContext, NoteLibrary.FolderLocation.Root, note.name)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as EditorActivity
+        activities += editor
+        waitForIdleSync()
+        await { views(editor.window.decorView).filterIsInstance<TextView>().any { it.text.toString() == "Editor heading 6" } }
+        try {
+            runOnMainSync {
+                (1..6).forEach { level ->
+                    val view = views(editor.window.decorView).filterIsInstance<TextView>()
+                        .first { it.text.toString() == "Editor heading $level" }
+                    val text = view.text as android.text.Spanned
+                    val spans = text.getSpans(0, text.length, ForegroundColorSpan::class.java)
+                    val expected = fixture.light.heading(level)
+                    check(spans.any { it.foregroundColor == expected }) {
+                        "Editor H$level has no expected color span; spans=${spans.map { SkinColor.hex(it.foregroundColor) }}"
+                    }
+                    val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    view.draw(android.graphics.Canvas(bitmap))
+                    val pixels = IntArray(bitmap.width * bitmap.height)
+                    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                    check(expected in pixels) { "Editor H$level renders without ${SkinColor.hex(expected)}" }
+                    bitmap.recycle()
+                }
+            }
+        } finally {
+            val screenshot = uiAutomation.takeScreenshot()
+            File(targetContext.filesDir, "skin-editor.png").outputStream().use {
+                screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            screenshot.recycle()
+        }
     }
 
     private fun documents() {

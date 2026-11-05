@@ -100,6 +100,8 @@ Mote 有清晰的阅读、编辑两种模式：
 SMOKE_SUITE=skin ANDROID_SERIAL=emulator-5560 scripts/device-smoke.sh --skip-build
 ```
 
+正式压缩 APK 还需单独验证：在全新的专用模拟器中，设置 `JAVA_HOME`、`ANDROID_HOME` 和 `ANDROID_SERIAL` 后运行 `bash scripts/release-heading-smoke.sh`。该测试不依赖未混淆的应用类，会打开真实笔记并检查 H1–H6 的颜色样式和绘制像素，防止仅在调试版正常的发布回归。
+
 ## 文件插入
 
 插入按钮使用 Android 系统文件选择器，并根据所选文件自动处理：
