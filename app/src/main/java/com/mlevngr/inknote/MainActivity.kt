@@ -20,7 +20,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.GravityCompat
@@ -53,7 +53,7 @@ import com.mlevngr.inknote.storage.SharedStorageManager
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : SkinnableActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var adapter: NoteLibraryAdapter
     private lateinit var folderAdapter: FolderStripAdapter
@@ -316,7 +316,8 @@ class MainActivity : AppCompatActivity() {
         val items = arrayOf(
             getString(R.string.theme_setting),
             getString(R.string.library_layout_setting),
-            getString(R.string.note_preview_setting)
+            getString(R.string.note_preview_setting),
+            getString(R.string.skin_settings)
         )
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.appearance)
@@ -325,6 +326,7 @@ class MainActivity : AppCompatActivity() {
                     0 -> showThemeDialog()
                     1 -> showLayoutDialog()
                     2 -> showPreviewDialog()
+                    3 -> startActivity(Intent(this, SkinSettingsActivity::class.java))
                 }
             }
             .show()
@@ -349,7 +351,7 @@ class MainActivity : AppCompatActivity() {
         }
         themes.forEachIndexed { index, theme ->
             val preview = ThemePalette.preview(theme, night)
-            val selected = theme == appearance.theme
+            val selected = theme == appearance.theme && !com.mlevngr.inknote.appearance.SkinPreferences(this).enabled
             val rowContent = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 orientation = LinearLayout.HORIZONTAL
@@ -406,7 +408,7 @@ class MainActivity : AppCompatActivity() {
             .create()
         options.forEach { (view, theme) ->
             view.setOnClickListener {
-                if (theme != appearance.theme) {
+                if (theme != appearance.theme || com.mlevngr.inknote.appearance.SkinPreferences(this).enabled) {
                     appearance.theme = theme
                     dialog.dismiss()
                     recreate()

@@ -24,7 +24,8 @@ class NotePageThumbnailRenderer(
     private val pageColor: Int,
     private val textColor: Int,
     private val secondaryTextColor: Int,
-    private val accentColor: Int
+    private val accentColor: Int,
+    private val headingColors: List<Int>? = null
 ) {
     fun render(entry: NoteLibrary.Entry, width: Int, height: Int): Bitmap {
         val bitmap = createBitmap(width, height)
@@ -141,11 +142,11 @@ class NotePageThumbnailRenderer(
             val typeface: Typeface
             val color: Int
             val text = when {
-                heading != null -> {
+                heading != null && !inCodeBlock && !raw.startsWith("    ") -> {
                     val level = heading.groupValues[1].length
                     size = pageWidth * (0.061f - level * 0.0035f)
                     typeface = Typeface.DEFAULT_BOLD
-                    color = textColor
+                    color = headingColors?.getOrNull(level - 1) ?: textColor
                     cleanInline(heading.groupValues[2])
                 }
                 inCodeBlock || raw.startsWith("    ") -> {

@@ -6,7 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -21,7 +21,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
-class DataSafetyActivity : AppCompatActivity() {
+class DataSafetyActivity : SkinnableActivity() {
     private lateinit var manager: VaultBackupManager
     private lateinit var backupFolder: TextView
     private lateinit var lastBackup: TextView

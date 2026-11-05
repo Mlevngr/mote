@@ -51,7 +51,8 @@ class NoteLibraryAdapter(
         pageColor = color(R.attr.inkNoteEditorBackground),
         textColor = color(R.attr.inkNoteTextPrimary),
         secondaryTextColor = color(R.attr.inkNoteTextSecondary),
-        accentColor = color(androidx.appcompat.R.attr.colorPrimary)
+        accentColor = color(androidx.appcompat.R.attr.colorPrimary),
+        headingColors = com.mlevngr.inknote.appearance.SkinPreferences.palette(context)?.headings
     )
 
     fun submit(

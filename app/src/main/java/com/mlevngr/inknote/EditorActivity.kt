@@ -21,7 +21,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
@@ -69,7 +69,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.io.File
 import java.util.UUID
 
-class EditorActivity : AppCompatActivity() {
+class EditorActivity : SkinnableActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var folderLocation: FolderLocation
     private lateinit var workspace: NoteWorkspace

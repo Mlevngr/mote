@@ -1,0 +1,39 @@
+{
+  "format": "mote-skin",
+  "version": 1,
+  "name": "暖纸",
+  "light": {
+    "background": "#FFF8EC",
+    "surface": "#F0E7D8",
+    "text": "#332F2A",
+    "secondaryText": "#746C60",
+    "accent": "#816442",
+    "outline": "#D4C4AB",
+    "error": "#A33D3D",
+    "headings": [
+      "#7D4F2C",
+      "#6252A0",
+      "#246E73",
+      "#996023",
+      "#9D3D54",
+      "#466D3E"
+    ]
+  },
+  "dark": {
+    "background": "#201E1B",
+    "surface": "#2D2924",
+    "text": "#E7DFD2",
+    "secondaryText": "#B6AA98",
+    "accent": "#D5B68B",
+    "outline": "#51483B",
+    "error": "#EE9D95",
+    "headings": [
+      "#E6BA88",
+      "#C3AFE5",
+      "#8FCBC9",
+      "#E0BC79",
+      "#E0A1AE",
+      "#B1CD9E"
+    ]
+  }
+}

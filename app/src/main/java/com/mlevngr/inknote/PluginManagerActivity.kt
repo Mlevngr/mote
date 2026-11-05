@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -20,7 +20,7 @@ import com.mlevngr.inknote.ui.SystemBarInsets
 import com.mlevngr.mote.plugin.api.PluginCapability
 import com.mlevngr.mote.plugin.api.PluginDescriptor
 
-class PluginManagerActivity : AppCompatActivity() {
+class PluginManagerActivity : SkinnableActivity() {
     private lateinit var host: MotePluginHost
     private lateinit var list: LinearLayout
     private lateinit var approvals: PluginApprovalStore

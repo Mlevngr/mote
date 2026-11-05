@@ -6,7 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.mlevngr.inknote.appearance.AppearancePreferences
@@ -15,7 +15,7 @@ import com.mlevngr.inknote.sync.WebDavSyncReport
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 
-class StorageSettingsActivity : AppCompatActivity() {
+class StorageSettingsActivity : SkinnableActivity() {
     private lateinit var manager: SharedStorageManager
     private lateinit var currentFolder: TextView
     private lateinit var chooseFolder: MaterialButton

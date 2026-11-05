@@ -43,10 +43,14 @@ enum class NotePreviewMode(val id: String) {
 
 class AppearancePreferences(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private val skinPreferences = SkinPreferences(context)
 
     var theme: AppTheme
         get() = AppTheme.fromId(preferences.getString(KEY_THEME, null))
-        set(value) { preferences.edit { putString(KEY_THEME, value.id) } }
+        set(value) {
+            preferences.edit { putString(KEY_THEME, value.id) }
+            skinPreferences.disable()
+        }
 
     var libraryLayout: LibraryLayoutMode
         get() = LibraryLayoutMode.fromId(preferences.getString(KEY_LIBRARY_LAYOUT, null))
@@ -61,7 +65,7 @@ class AppearancePreferences(context: Context) {
         set(value) { preferences.edit { putString(KEY_LIBRARY_SORT, value.id) } }
 
     fun applyTheme(activity: Activity) {
-        activity.setTheme(theme.styleRes)
+        activity.setTheme(if (SkinTheme.isApplied(activity)) R.style.Theme_InkNote_Skin else theme.styleRes)
     }
 
     private companion object {

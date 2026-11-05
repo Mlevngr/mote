@@ -28,7 +28,13 @@ done
 "$adb" -s "$ANDROID_SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 # Raw output preserves result fields even when the runner provides a human-readable stream.
 # am instrument may return exit code 0 for failed tests; require explicit success markers.
-timeout 600 "$adb" -s "$ANDROID_SERIAL" shell am instrument -w -r \
+suite_args=()
+case "${SMOKE_SUITE:-editor}" in
+  editor) ;;
+  skin) suite_args=(-e suite skin) ;;
+  *) echo 'SMOKE_SUITE must be editor or skin'; exit 1 ;;
+esac
+timeout 600 "$adb" -s "$ANDROID_SERIAL" shell am instrument -w -r "${suite_args[@]}" \
   com.mlevngr.inknote.test/com.mlevngr.inknote.EditorSmokeInstrumentation | tee "$log"
 grep -q '^INSTRUMENTATION_RESULT: failures=0' "$log"
 grep -q '^INSTRUMENTATION_CODE: -1' "$log"

@@ -5,7 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,7 +20,7 @@ import com.mlevngr.inknote.ui.TrashAdapter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-class TrashActivity : AppCompatActivity() {
+class TrashActivity : SkinnableActivity() {
     private lateinit var library: NoteLibrary
     private lateinit var preferences: TrashPreferences
     private lateinit var adapter: TrashAdapter

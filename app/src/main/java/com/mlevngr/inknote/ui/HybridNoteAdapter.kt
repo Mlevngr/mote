@@ -70,6 +70,11 @@ class HybridNoteAdapter(
         .usePlugin(StrikethroughPlugin.create())
         .usePlugin(TablePlugin.create(context))
         .usePlugin(TaskListPlugin.create(context))
+        .apply {
+            com.mlevngr.inknote.appearance.SkinPreferences.palette(context)?.let {
+                usePlugin(com.mlevngr.inknote.appearance.SkinHeadingPlugin(it))
+            }
+        }
         .build()
     private val worker = Executors.newFixedThreadPool(2)
     private val main = Handler(Looper.getMainLooper())

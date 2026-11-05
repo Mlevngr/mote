@@ -1,7 +1,6 @@
 package com.mlevngr.inknote
 
 import android.app.Activity
-import android.app.Instrumentation
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
@@ -19,7 +18,8 @@ import com.mlevngr.inknote.ui.NoteCanvasZoomLayout
 import kotlin.math.abs
 
 /** Dependency-free device smoke suite. Run on an emulator/test device, not a personal note vault. */
-class EditorSmokeInstrumentation : Instrumentation() {
+class EditorSmokeInstrumentation : SkinSmokeInstrumentation() {
+    private var skinSuite = false
     private lateinit var activity: EditorActivity
     private lateinit var canvas: NoteCanvasZoomLayout
     private lateinit var list: RecyclerView
@@ -28,10 +28,15 @@ class EditorSmokeInstrumentation : Instrumentation() {
 
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        skinSuite = arguments?.getString("suite") == "skin"
         start()
     }
 
     override fun onStart() {
+        if (skinSuite) {
+            runSkinSmokeTests()
+            return
+        }
         val tests = listOf<Pair<String, () -> Unit>>(
             "fitWidthScrollIsStillForwarded" to ::fitWidthScroll,
             "singleFingerPanAndPointerHandoff" to ::panAndHandoff,

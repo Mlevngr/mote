@@ -5,7 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.mlevngr.inknote.appearance.SkinnableActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -18,7 +18,7 @@ import com.mlevngr.inknote.sync.WebDavSyncManager
 import com.mlevngr.inknote.ui.SystemBarInsets
 import java.util.concurrent.Executors
 
-class WebDavSettingsActivity : AppCompatActivity() {
+class WebDavSettingsActivity : SkinnableActivity() {
     private lateinit var preferences: WebDavPreferences
     private lateinit var saveAndTest: MaterialButton
     private lateinit var syncNow: MaterialButton
