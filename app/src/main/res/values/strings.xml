@@ -74,6 +74,13 @@
     <string name="go_up">返回上级文件夹</string>
     <string name="create_folder">新建文件夹</string>
     <string name="create_note">新建笔记</string>
+    <string name="import_markdown">导入 Markdown</string>
+    <string name="importing_markdown">正在导入 Markdown…</string>
+    <string name="sort_library">文件夹与笔记排序</string>
+    <string name="sort_name_ascending">名称：正序（A → Z）</string>
+    <string name="sort_name_descending">名称：倒序（Z → A）</string>
+    <string name="sort_modified_ascending">修改时间：正序（最早在前）</string>
+    <string name="sort_modified_descending">修改时间：倒序（最新在前）</string>
     <string name="folder_name">文件夹名称</string>
     <string name="note_name">笔记名称</string>
     <string name="note_title_hint">标题</string>

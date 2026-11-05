@@ -5,9 +5,11 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -17,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.graphics.ColorUtils
@@ -36,9 +39,11 @@ import com.mlevngr.inknote.appearance.LibraryLayoutMode
 import com.mlevngr.inknote.appearance.NotePreviewMode
 import com.mlevngr.inknote.appearance.ThemePalette
 import com.mlevngr.inknote.library.FolderColor
+import com.mlevngr.inknote.library.LibrarySort
 import com.mlevngr.inknote.library.NoteLibrary
 import com.mlevngr.inknote.library.NoteLibrary.FolderLocation
 import com.mlevngr.inknote.library.TrashPreferences
+import com.mlevngr.inknote.markdown.MarkdownNoteImport
 import com.mlevngr.inknote.appearance.ThemeColors
 import com.mlevngr.inknote.ui.NoteLibraryAdapter
 import com.mlevngr.inknote.ui.FolderStripAdapter
@@ -66,6 +71,15 @@ class MainActivity : AppCompatActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val refreshRevision = AtomicInteger()
     private var lastSharedStorageError: String? = null
+    private var importFolder: FolderLocation? = null
+    private var importName: String? = null
+    private val openMarkdown = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val destination = importFolder ?: currentFolder
+        val requestedName = importName
+        importFolder = null
+        importName = null
+        if (uri != null) importMarkdown(uri, destination, requestedName)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         appearance = AppearancePreferences(this)
@@ -85,6 +99,9 @@ class MainActivity : AppCompatActivity() {
                 ?.getStringArrayList(STATE_FOLDER)
                 ?.let { FolderLocation(it.toList()) }
         }.getOrNull() ?: FolderLocation.Root
+        importFolder = savedInstanceState?.getStringArrayList(STATE_IMPORT_FOLDER)
+            ?.let { FolderLocation(it.toList()) }
+        importName = savedInstanceState?.getString(STATE_IMPORT_NAME)
         adapter = NoteLibraryAdapter(this, ::openEntry, ::showEntryActions)
         folderAdapter = FolderStripAdapter(this, ::openEntry, ::showEntryActions)
         libraryTitle = findViewById(R.id.library_title)
@@ -138,6 +155,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<AppCompatImageButton>(R.id.create_note).setOnClickListener {
             showCreateDialog(CreateType.Note)
         }
+        findViewById<AppCompatImageButton>(R.id.sort_library).setOnClickListener {
+            showSortDialog()
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (drawer.isDrawerOpen(GravityCompat.START)) {
@@ -161,6 +181,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putStringArrayList(STATE_FOLDER, ArrayList(currentFolder.names))
+        importFolder?.let { outState.putStringArrayList(STATE_IMPORT_FOLDER, ArrayList(it.names)) }
+        outState.putString(STATE_IMPORT_NAME, importName)
         super.onSaveInstanceState(outState)
     }
 
@@ -196,8 +218,9 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
-                val folders = entries.filter { it.type == NoteLibrary.EntryType.Folder }
-                val notes = entries.filter { it.type == NoteLibrary.EntryType.Note }
+                val sorted = appearance.librarySort.sort(entries)
+                val folders = sorted.filter { it.type == NoteLibrary.EntryType.Folder }
+                val notes = sorted.filter { it.type == NoteLibrary.EntryType.Note }
                 folderAdapter.submit(folders)
                 folderSection.visibility = if (folders.isEmpty()) View.GONE else View.VISIBLE
                 adapter.submit(notes, appearance.libraryLayout, appearance.notePreview)
@@ -457,6 +480,57 @@ class MainActivity : AppCompatActivity() {
         refresh()
     }
 
+    private fun showSortDialog() {
+        val options = LibrarySort.entries
+        val labels = arrayOf(
+            getString(R.string.sort_name_ascending),
+            getString(R.string.sort_name_descending),
+            getString(R.string.sort_modified_ascending),
+            getString(R.string.sort_modified_descending)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.sort_library)
+            .setSingleChoiceItems(labels, options.indexOf(appearance.librarySort)) { dialog, which ->
+                appearance.librarySort = options[which]
+                dialog.dismiss()
+                refresh()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun importMarkdown(uri: Uri, destination: FolderLocation, requestedName: String?) {
+        Toast.makeText(this, R.string.importing_markdown, Toast.LENGTH_SHORT).show()
+        io.execute {
+            val result = runCatching {
+                val displayName = contentResolver.query(
+                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: "导入笔记.md"
+                val fileName = MarkdownNoteImport.noteName(displayName)
+                val markdown = requireNotNull(contentResolver.openInputStream(uri)) {
+                    "无法读取所选文件"
+                }.use(MarkdownNoteImport::read)
+                library.createNote(destination, requestedName ?: fileName, markdown)
+            }
+            main.post {
+                if (isFinishing || isDestroyed) return@post
+                result.onSuccess { entry ->
+                    currentFolder = destination
+                    refresh()
+                    openEntry(entry)
+                }.onFailure { error ->
+                    Toast.makeText(
+                        this,
+                        getString(R.string.import_failed, error.message ?: getString(R.string.unknown_error)),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
     private fun showCreateDialog(type: CreateType) {
         val input = TextInputEditText(this).apply {
             setSingleLine()
@@ -480,12 +554,28 @@ class MainActivity : AppCompatActivity() {
                 topMargin = margin / 2
             })
         }
-        val dialog = MaterialAlertDialogBuilder(this)
+        val builder = MaterialAlertDialogBuilder(this)
             .setTitle(if (type == CreateType.Folder) R.string.create_folder else R.string.create_note)
             .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.create, null)
-            .create()
+        if (type == CreateType.Note) {
+            builder.setNeutralButton(R.string.import_markdown) { _, _ ->
+                importFolder = currentFolder
+                importName = input.text?.toString()?.trim()?.takeIf(String::isNotBlank)
+                // Providers often report .md as application/octet-stream, so validate the name on return.
+                runCatching { openMarkdown.launch(arrayOf("*/*")) }.onFailure { error ->
+                    importFolder = null
+                    importName = null
+                    Toast.makeText(
+                        this,
+                        getString(R.string.import_failed, error.message ?: getString(R.string.unknown_error)),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+        val dialog = builder.create()
         dialog.setOnShowListener {
             dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
                 runCatching {
@@ -802,6 +892,8 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val STATE_FOLDER = "current_folder"
+        const val STATE_IMPORT_FOLDER = "import_folder"
+        const val STATE_IMPORT_NAME = "import_name"
         const val NAVIGATION_PREFERENCES = "navigation_ui"
         const val DRAWER_INTRODUCTION_KEY = "drawer_introduction_build_44"
         const val SHARED_STORAGE_INTRODUCTION_KEY = "shared_storage_introduction_build_50"

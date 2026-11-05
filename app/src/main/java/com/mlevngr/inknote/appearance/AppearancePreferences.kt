@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.annotation.StyleRes
 import androidx.core.content.edit
 import com.mlevngr.inknote.R
+import com.mlevngr.inknote.library.LibrarySort
 
 enum class AppTheme(val id: String, @param:StyleRes val styleRes: Int) {
     InkNote("inknote", R.style.Theme_InkNote),
@@ -55,6 +56,10 @@ class AppearancePreferences(context: Context) {
         get() = NotePreviewMode.fromId(preferences.getString(KEY_NOTE_PREVIEW, null))
         set(value) { preferences.edit { putString(KEY_NOTE_PREVIEW, value.id) } }
 
+    var librarySort: LibrarySort
+        get() = LibrarySort.fromId(preferences.getString(KEY_LIBRARY_SORT, null))
+        set(value) { preferences.edit { putString(KEY_LIBRARY_SORT, value.id) } }
+
     fun applyTheme(activity: Activity) {
         activity.setTheme(theme.styleRes)
     }
@@ -64,5 +69,6 @@ class AppearancePreferences(context: Context) {
         const val KEY_THEME = "theme"
         const val KEY_LIBRARY_LAYOUT = "library_layout"
         const val KEY_NOTE_PREVIEW = "note_preview"
+        const val KEY_LIBRARY_SORT = "library_sort"
     }
 }

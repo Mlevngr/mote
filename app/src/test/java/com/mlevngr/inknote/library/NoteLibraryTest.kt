@@ -18,6 +18,31 @@ class NoteLibraryTest {
         return root to NoteLibrary(root)
     }
 
+    @Test fun createsImportedNoteWithOriginalBodyAndMigrationMarker() {
+        val (root, library) = library()
+        val folder = library.createFolder(rootLocation, "导入")
+        val location = rootLocation.child(folder.name)
+        val markdown = "# 原始标题\n\n正文\n"
+        val name = com.mlevngr.inknote.markdown.MarkdownNoteImport.noteName("原始标题.markdown")
+        val note = library.createNote(location, name, markdown)
+
+        assertEquals("原始标题", note.name)
+        assertEquals(markdown, File(root, "${note.relativePath}/note.md").readText())
+        assertTrue(File(root, "${note.relativePath}/${NoteLibrary.BODY_SEPARATION_MARKER}").isFile)
+        assertTrue(File(root, "${note.relativePath}/assets").isDirectory)
+        assertEquals(listOf(note.name), library.list(location).map { it.name })
+    }
+
+    @Test fun importingDuplicateNameKeepsBothBodies() {
+        val (root, library) = library()
+        val first = library.createNote(rootLocation, "阅读笔记.md", "原笔记")
+        val second = library.createNote(rootLocation, "阅读笔记.md", "导入正文")
+
+        assertEquals("阅读笔记 (1)", second.name)
+        assertEquals("原笔记", File(root, "${first.relativePath}/note.md").readText())
+        assertEquals("导入正文", File(root, "${second.relativePath}/note.md").readText())
+    }
+
     @Test fun createsFoldersAndNotesAndListsFoldersFirst() {
         val (root, library) = library()
         val note = library.createNote(rootLocation, "Ideas.md")

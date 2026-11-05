@@ -73,7 +73,11 @@ class NoteLibrary internal constructor(private val root: File) {
             folderEntry(folder)
         }
 
-    fun createNote(location: FolderLocation, requestedName: String): Entry =
+    fun createNote(
+        location: FolderLocation,
+        requestedName: String,
+        initialMarkdown: String = ""
+    ): Entry =
         VaultOperationLock.withLock {
             val parent = requireFolder(location)
             val name = normalizedName(requestedName, stripMarkdownExtension = true)
@@ -81,7 +85,7 @@ class NoteLibrary internal constructor(private val root: File) {
             check(note.mkdir()) { "无法创建笔记" }
             runCatching {
                 check(File(note, ASSETS_DIRECTORY).mkdirs()) { "无法创建附件目录" }
-                AtomicFileWriter.writeText(File(note, NOTE_FILE), "")
+                AtomicFileWriter.writeText(File(note, NOTE_FILE), initialMarkdown)
                 AtomicFileWriter.writeText(File(note, BODY_SEPARATION_MARKER), "")
                 noteEntry(note)
             }.getOrElse { error ->
